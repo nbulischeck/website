@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Tags on Nick&#39;s Blog</title>
+    <link>https://nbulischeck.io/tags/</link>
+    <description>Recent content in Tags on Nick&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 06 Dec 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="https://nbulischeck.io/tags/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>crypto</title>
+      <link>https://nbulischeck.io/tags/crypto/</link>
+      <pubDate>Fri, 06 Dec 2019 00:00:00 +0000</pubDate>
+      
+      <guid>https://nbulischeck.io/tags/crypto/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>python</title>
+      <link>https://nbulischeck.io/tags/python/</link>
+      <pubDate>Fri, 06 Dec 2019 00:00:00 +0000</pubDate>
+      
+      <guid>https://nbulischeck.io/tags/python/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>c</title>
+      <link>https://nbulischeck.io/tags/c/</link>
+      <pubDate>Tue, 22 May 2018 12:00:00 +0300</pubDate>
+      
+      <guid>https://nbulischeck.io/tags/c/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>kernel</title>
+      <link>https://nbulischeck.io/tags/kernel/</link>
+      <pubDate>Tue, 22 May 2018 12:00:00 +0300</pubDate>
+      
+      <guid>https://nbulischeck.io/tags/kernel/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>linux</title>
+      <link>https://nbulischeck.io/tags/linux/</link>
+      <pubDate>Tue, 22 May 2018 12:00:00 +0300</pubDate>
+      
+      <guid>https://nbulischeck.io/tags/linux/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>

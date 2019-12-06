@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en-us">
+	<head>
+    <meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Nick Bulischeck">
+<meta name="description" content="Yet Another Cybersecurity Blog">
+<meta name="generator" content="Hugo 0.60.1" />
+<title>Introduction to Kernel Module Development</title>
+<link rel="shortcut icon" href="https://nbulischeck.io/images/favicon.ico">
+<link rel="stylesheet" href="https://nbulischeck.io/css/style.css">
+<link rel="stylesheet" href="https://nbulischeck.io/css/highlight.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+
+
+
+<link href="https://nbulischeck.io/index.xml" rel="alternate" type="application/rss+xml" title="Nick&#39;s Blog" />
+
+
+<meta property="og:title" content="Introduction to Kernel Module Development" />
+<meta property="og:description" content="An introduction to programming loadable kernel modules" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://nbulischeck.io/posts/introduction-to-kernel-module-development/" />
+<meta property="article:published_time" content="2018-04-25T22:00:00+03:00" />
+<meta property="article:modified_time" content="2018-04-25T22:00:00+03:00" />
+
+
+<meta itemprop="name" content="Introduction to Kernel Module Development">
+<meta itemprop="description" content="An introduction to programming loadable kernel modules">
+<meta itemprop="datePublished" content="2018-04-25T22:00:00&#43;03:00" />
+<meta itemprop="dateModified" content="2018-04-25T22:00:00&#43;03:00" />
+<meta itemprop="wordCount" content="825">
+
+
+
+<meta itemprop="keywords" content="linux,kernel,c," />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Introduction to Kernel Module Development"/>
+<meta name="twitter:description" content="An introduction to programming loadable kernel modules"/>
+<meta name="twitter:site" content="@https://www.twitter.com/nbulischeck"/>
+
+
+    </head>
+<body>
+    <nav class="main-nav">
+	
+		<a href='https://nbulischeck.io/'>Home</a>
+	
+
+	
+ 		<a href='/about/'>About</a>
+  	
+
+    <a href='https://nbulischeck.io//tags'>Tags</a>
+
+	
+		<a href="https://nbulischeck.io/index.xml">RSS</a>
+	
+</nav>
+
+    <section id="wrapper">
+        
+        
+<article class="post">
+    <header>
+        <h1>Introduction to Kernel Module Development</h1>
+        <h2 class="subtitle">An introduction to programming loadable kernel modules</h2>
+        <h2 class="headline">
+        April 25, 2018
+        <br>
+          
+            
+              
+              <a href="https://nbulischeck.io/tags/linux">linux</a>
+            
+               | 
+              <a href="https://nbulischeck.io/tags/kernel">kernel</a>
+            
+               | 
+              <a href="https://nbulischeck.io/tags/c">c</a>
+            
+          
+        </h2>
+    </header>
+    <section id="post-body">
+        <h2 id="introduction">Introduction</h2>
+<p>This post will serve as an introduction to those wanting to get into the development of loadable kernel modules. Loadable kernel modules, LKMs for short, are an integral companion to the Linux kernel. Imagine the Linux kernel as a giant robot. Let's say that this giant robot is already amazing as is, but you want to upgrade it with your own custom flamethrower. You'd have to first build your flamethrower and then attach it to the giant robot. You may not have helped build the giant robot, but you added some additional functionality to it. It runs the same way it did before, but now it's even better! This is exactly the same scenario for LKMs. Intuitively, when your giant robot's flamethrower is no longer needed (he or she is a pacifist now), it can be safely removed in order to free up space.</p>
+<p>Typically, LKMs are used to add support for new hardware (as device drivers) or filesystems, or add additional system calls. Without LKMs, an operating system would have to include all possible anticipated functionality. This is borderline impossible to do when developing a platform to be used with everything from a smartphone to a server.</p>
+<p>In summary, LKMs provide additional functionality to the kernel, and by extension the user of the computer, and can be safely added or removed when they are needed or not needed.</p>
+<h2 id="lkm-development">LKM Development</h2>
+<p>I'm making the assumption that most users have a competent grasp on the C language and have written a fair few programs before. Writing for the kernel, however, is quite different from writing userland applications. It would be unnecssary to cover them all in a single post (especially the introduction), but it usually boils down to the fact that you no longer have the glibc at your disposal, you have a restricted set of string functions to choose from (albeit I have no gripes as it's fairly robust), and now most of your core function names have a &lsquo;k&rsquo; somewhere in it (kmalloc, printk, etc.).</p>
+<h3 id="generic-lkm">Generic LKM</h3>
+<p>The following is a template for a generic kernel module and its corresponding makefile. It has no functionality other than to output <code>Hello, world!</code>, but you can practice loading and unloading the kernel module with <code>lsmod</code> and <code>rmmod</code> respectively.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#75715e">/* hello.c */</span>
+<span style="color:#75715e">#</span><span style="color:#75715e">include</span> <span style="color:#75715e">&lt;linux/module.h&gt; /* Needed by all modules */</span><span style="color:#75715e">
+</span><span style="color:#75715e"></span><span style="color:#75715e">#</span><span style="color:#75715e">include</span> <span style="color:#75715e">&lt;linux/kernel.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e"></span>
+<span style="color:#66d9ef">int</span> <span style="color:#a6e22e">init_module</span>(<span style="color:#66d9ef">void</span>){
+	printk(KERN_INFO <span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">Hello, world!</span><span style="color:#e6db74">&#34;</span>);
+	<span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+}
+
+<span style="color:#66d9ef">void</span> <span style="color:#a6e22e">cleanup_module</span>(<span style="color:#66d9ef">void</span>){
+	<span style="color:#66d9ef">return</span>;
+}
+</code></pre></div><p>We can break this code down into 3 distinct parts:</p>
+<p>Header Files</p>
+<ul>
+<li>The header files we include are <code>module.h</code> and <code>kernel.h</code>. <code>module.h</code> is needed by all kernel modules. <code>kernel.h</code> is needed to use the kernel macro expansion (KERN_INFO) in <code>printk()</code>.</li>
+</ul>
+<p><code>init_module()</code></p>
+<ul>
+<li>The <code>init_module()</code> function is called when you first load the kernel module into the kernel with <code>lsmod</code>. Because of this, it is only ever called once which makes it a good place to spawn all of your kernel threads or hook functions.</li>
+</ul>
+<p><code>cleanup_module()</code></p>
+<ul>
+<li>Conversely, the <code>cleanup_module()</code> function is called when you unload the kernel module from the kernel with <code>rmmod</code>. This function is only ever called once which makes it a good place to perform all of the necessary tasks that return the kernel to the state it was in before you loaded the module.</li>
+</ul>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-makefile" data-lang="makefile"><span style="color:#75715e">#Makefile
+</span><span style="color:#75715e"></span>MODULE <span style="color:#f92672">:=</span> hello
+
+obj-m <span style="color:#f92672">:=</span> <span style="color:#66d9ef">$(</span>MODULE<span style="color:#66d9ef">)</span>.o
+
+<span style="color:#a6e22e">default</span><span style="color:#f92672">:</span> all
+
+<span style="color:#a6e22e">all</span><span style="color:#f92672">:</span>
+	make -C /lib/modules/<span style="color:#66d9ef">$(</span>shell uname -r<span style="color:#66d9ef">)</span>/build M<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>PWD<span style="color:#66d9ef">)</span> modules
+
+<span style="color:#a6e22e">clean</span><span style="color:#f92672">:</span>
+	make -C /lib/modules/<span style="color:#66d9ef">$(</span>shell uname -r<span style="color:#66d9ef">)</span>/build M<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>PWD<span style="color:#66d9ef">)</span> clean
+</code></pre></div><p>This is a generic makefile that is used to compile kernel modules. This makefile assumes the initial source filename is <code>hello.c</code>. The name of the resulting file will be <code>hello.ko</code>. To insert the kernel module into your kernel, run the command <code>sudo insmod hello.ko</code>. To remove the kernel module from your kernel, run the command <code>sudo rmmod hello</code>.</p>
+<p>To see the output of the kernel module, I recommend opening another terminal and running the command <code>watch journalctl -r -k -a</code>. To quickly break that down, <code>watch</code> refreshes the output every 2 seconds by default, <code>journalctl</code> shows your system logs, <code>-r</code> prints the log in reverse (latest messages are at the top), <code>-k</code> prints kernel messages only, and <code>-a</code> makes <code>journalctl</code> print all characters even unprintable characters or characters that go past the normal limit.</p>
+<p>For an extended (but outdated) reference to an introduction to kernel module development, please visit the <a href="http://www.tldp.org/LDP/lkmpg/2.6/html">TLDP Kernel Module Programming Guide</a>.</p>
+<h3 id="lkm-development-issues">LKM Development Issues</h3>
+<p>If you are looking to develop a LKM for your kernel in order to add some additional functionality (I'm assuming you are), I have unfortunate news. The documentation for kernel module development is extremely scarce. Also, including the TLDP guide I linked earlier, most of the currently available documentation online has outdated instructions. They are typically targeting the Linux kernel versions from 2.4 (2001) to 2.6 (2003). I have found that looking at recently created kernel modules and LKM rootkits on Github as well as the kernel source code of the kernel version you're targeting is the most effective way to develop a LKM.</p>
+
+    </section>
+</article>
+
+
+
+
+
+        
+            <footer id="footer">
+    
+        <div id="social">
+
+	
+	
+    <a class="symbol" href="https://www.github.com/nbulischeck">
+        <i class="fa fa-github"></i>
+    </a>
+    
+    <a class="symbol" href="https://www.twitter.com/nbulischeck">
+        <i class="fa fa-twitter"></i>
+    </a>
+    
+
+
+</div>
+
+    
+    <p class="small">
+    
+        © Copyright 2019 Nick Bulischeck
+    
+    </p>
+</footer>
+
+        
+    </section>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://nbulischeck.io/js/main.js"></script>
+<script src="https://nbulischeck.io/js/highlight.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-154144453-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+
+
+</body>
+</html>

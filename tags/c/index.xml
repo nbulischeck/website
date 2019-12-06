@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>c on Nick&#39;s Blog</title>
+    <link>https://nbulischeck.io/tags/c/</link>
+    <description>Recent content in c on Nick&#39;s Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Tue, 22 May 2018 12:00:00 +0300</lastBuildDate>
+    
+	<atom:link href="https://nbulischeck.io/tags/c/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Misusing debugfs for In-Memory Code Execution</title>
+      <link>https://nbulischeck.io/posts/misusing-debugfs-for-in-memory-rce/</link>
+      <pubDate>Tue, 22 May 2018 12:00:00 +0300</pubDate>
+      
+      <guid>https://nbulischeck.io/posts/misusing-debugfs-for-in-memory-rce/</guid>
+      <description>Introduction Debugfs is a simple-to-use RAM-based file system specially designed for kernel debugging purposes. It was released with version 2.6.10-rc3 and written by Greg Kroah-Hartman. In this post, I will be showing you how to use debugfs and Netfilter hooks to create a Loadable Kernel Module capable of executing code remotely entirely in RAM.
+An attacker&#39;s ideal process would be to first gain unprivileged access to the target, perform a local privilege escalation to gain root access, insert the kernel module onto the machine as a method of persistence, and then pivot to the next target.</description>
+    </item>
+    
+    <item>
+      <title>Introduction to Kernel Module Development</title>
+      <link>https://nbulischeck.io/posts/introduction-to-kernel-module-development/</link>
+      <pubDate>Wed, 25 Apr 2018 22:00:00 +0300</pubDate>
+      
+      <guid>https://nbulischeck.io/posts/introduction-to-kernel-module-development/</guid>
+      <description>Introduction This post will serve as an introduction to those wanting to get into the development of loadable kernel modules. Loadable kernel modules, LKMs for short, are an integral companion to the Linux kernel. Imagine the Linux kernel as a giant robot. Let&#39;s say that this giant robot is already amazing as is, but you want to upgrade it with your own custom flamethrower. You&#39;d have to first build your flamethrower and then attach it to the giant robot.</description>
+    </item>
+    
+  </channel>
+</rss>
