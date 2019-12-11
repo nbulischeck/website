@@ -35,7 +35,7 @@ As a quick example, if I were to give you two prime numbers, $$7$$ and $$13$$, a
  - **This is *almost* always 3 (for less powerful devices) or 65,537.**
  - $$e$$ is the public key exponent.
 5. Determine $$d$$ as $$d \equiv e^{-1} \pmod{\lambda(n)}$$
- - $$d$$ is the private key exponent. **$$(d)$$ is kept secret and never distributed.**$$\footnote{1}$$
+ - $$d$$ is the private key exponent. **$$(d)$$ is kept secret and never distributed.**
 
 The public key consists of $$n$$ and $$e$$. The private key consists of $$n$$ and $$d$$.
 
