@@ -11,4 +11,5 @@ My name is Nick Bulischeck, I received my B.S. in Computer Science with a minor 
 
 ### Recommended Posts
 
-1. [Introduction to Kernel Module Development]({{< ref "posts/introduction-to-kernel-module-development" >}}) - An article introducing newcomers to Linux kernel module development.
+1. [Introduction to Kernel Module Development]({{< ref "posts/introduction-to-kernel-module-development" >}})
+ - An article introducing newcomers to Linux kernel module development.

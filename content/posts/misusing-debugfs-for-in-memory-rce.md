@@ -127,7 +127,9 @@ For our case, we don't need to mangle any packets, but for the reader this may b
 
 Netfilter hooks are great because you don't need to expose any ports on the host to get the information. If you want a more in-depth look at Netfilter you can [read the article here](<https://www.landhb.me/posts/bODdK/port-knocking-with-netfilter-kernel-modules/>) or the [Netfilter documentation](<https://www.netfilter.org/documentation/HOWTO/netfilter-hacking-HOWTO-3.html>).
 
+{{< image >}}
 ![Netfilter Routing](/images/debugfs/netfilter-hooks.png)
+{{</ image >}}
 
 When I use Netfilter, I will be intercepting packets in the earliest stage, pre-routing.
 
@@ -272,7 +274,9 @@ The simplest mitigation for this is to remount debugfs as `noexec` so that execu
 
 For kernel modules in general, module signing should be required by default. Module signing involves cryptographically signing kernel modules during installation and then checking the signature upon loading it into the kernel. "[This allows increased kernel security by disallowing the loading of unsigned modules or modules signed with an invalid key. Module signing increases security by making it harder to load a malicious module into the kernel.](https://www.kernel.org/doc/html/v4.16/admin-guide/module-signing.html)"
 
+{{< image >}}
 ![Debugfs with No Execute](/images/debugfs/debugfs-noexec.png)
+{{</ image >}}
 
 ```
 # Mounted without noexec (default)

@@ -179,6 +179,9 @@ a,
 	transition: all 0.15s ease;
 }
 
+li > p {
+    margin-bottom: 0rem; }
+
 ul, ol 	{ 
     margin-left: 1rem; }
 
@@ -360,6 +363,9 @@ img {
 	border-radius: 3px;
 }
 
+.center-image {
+    text-align: center; }
+
 /* Made with Cactus Badge */
 #badge {
 	position: absolute;
@@ -401,8 +407,7 @@ Post List
 #post-list .dates {
 	float: right;
 	position: relative;
-	top: 1px;
-	font: 300 17px/1.8 "Helvetica Neue",helvetica,Arial,sans-serif;
+	font: 300 17px/1.8 "Helvetica Neue", Helvetica,Arial,sans-serif;
 	color: #bbb;
 }
 
@@ -565,9 +570,10 @@ h2.month {
 #archive-list .dates {
 	float: right;
 	position: relative;
-	top: 1px;
 	font: 300 17px/1.7 "Helvetica Neue",helvetica,Arial,sans-serif;
 	color: #bbb;
+    padding-left: 1rem;
+    padding-bottom: 1rem;
 }
 
 #archive-list li a:hover,#archive-list li:hover .dates {
@@ -621,14 +627,17 @@ h2.month {
 
 /* Media Queries */
 @media screen and (max-width: 540px) {
-	#wrapper { padding:20px 20px 20px 20px;}
+	#wrapper {
+        padding:20px 20px 20px 20px;
+        margin: 0rem auto 0 auto;
+    }
 	.post { margin: 40px 0; }
 
 	#post-list, #archive-list { margin-top: 0; }
 	#post-meta { margin-top: 60px; }
 
 	#title { font-size: 17px; }
-	#post-list .dates { display: none; }
+	#post-list .dates { display: block; }
 
 	#post-list-footer { margin-top: 20px; padding-top: 40px; }
 
@@ -638,6 +647,45 @@ h2.month {
 	.post h2 { font-size:20px; }
 }
 
+@media screen and (max-width: 800px) {
+	#wrapper {
+        padding:20px 20px 20px 20px;
+        margin: 0rem auto 0 auto;
+    }
+	.post { margin: 40px 0; }
+
+	#post-list, #archive-list { margin-top: 0; }
+	#post-meta { margin-top: 60px; }
+
+	#title { font-size: 17px; }
+	#post-list .dates { display: block; }
+
+	#post-list-footer { margin-top: 20px; padding-top: 40px; }
+
+	h1 { font-size: 26px; }
+	.post h2.headline { font-size: 13px; }
+	.post h2 { font-size:20px; }
+}
+
+@media screen and (max-width: 960px) {
+	#wrapper {
+        padding:20px 20px 20px 20px;
+        margin: 0rem auto 0 auto;
+    }
+	.post { margin: 40px 0; }
+
+	#post-list, #archive-list { margin-top: 0; }
+	#post-meta { margin-top: 60px; }
+
+	#title { font-size: 17px; }
+	#post-list .dates { display: block; }
+
+	#post-list-footer { margin-top: 20px; padding-top: 40px; }
+
+	h1 { font-size: 26px; }
+	.post h2.headline { font-size: 13px; }
+	.post h2 { font-size:20px; }
+}
 
 /* CUSTOM ADDITIONS */
 
