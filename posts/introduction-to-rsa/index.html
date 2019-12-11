@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en-us">
+	<head>
+    <meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Nick Bulischeck">
+<meta name="description" content="Yet Another Cybersecurity Blog">
+<meta name="generator" content="Hugo 0.60.1" />
+<title>An Introduction to RSA</title>
+<link rel="shortcut icon" href="https://nbulischeck.io/images/favicon.ico">
+<link rel="stylesheet" href="https://nbulischeck.io/css/style.css">
+<link rel="stylesheet" href="https://nbulischeck.io/css/highlight.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css" integrity="sha384-zB1R0rpPzHqg7Kpt0Aljp8JPLqbXI3bhnPWROx27a9N0Ll6ZP/+DiW/UqRcLbRjq" crossorigin="anonymous">
+
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js" integrity="sha384-y23I5Q6l+B6vatafAwxRu/0oK/79VlbSz7Q9aiSZUvyWYIYsd+qj+o24G5ZU2zJz" crossorigin="anonymous"></script>
+
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous"
+        onload="renderMathInElement(document.body);"></script>
+
+
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+
+
+
+<link href="https://nbulischeck.io/index.xml" rel="alternate" type="application/rss+xml" title="Nick&#39;s Blog" />
+
+
+<meta property="og:title" content="An Introduction to RSA" />
+<meta property="og:description" content="A walkthrough of the math behind RSA encryption and decryption" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://nbulischeck.io/posts/introduction-to-rsa/" />
+<meta property="article:published_time" content="2019-12-06T00:00:00+00:00" />
+<meta property="article:modified_time" content="2019-12-06T00:00:00+00:00" />
+
+
+<meta itemprop="name" content="An Introduction to RSA">
+<meta itemprop="description" content="A walkthrough of the math behind RSA encryption and decryption">
+<meta itemprop="datePublished" content="2019-12-06T00:00:00&#43;00:00" />
+<meta itemprop="dateModified" content="2019-12-06T00:00:00&#43;00:00" />
+<meta itemprop="wordCount" content="1964">
+
+
+
+<meta itemprop="keywords" content="python,crypto," />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="An Introduction to RSA"/>
+<meta name="twitter:description" content="A walkthrough of the math behind RSA encryption and decryption"/>
+<meta name="twitter:site" content="@https://www.twitter.com/nbulischeck"/>
+
+
+    </head>
+<body>
+    <nav class="main-nav">
+	
+		<a href='https://nbulischeck.io/'>Home</a>
+	
+
+	
+ 		<a href='/about/'>About</a>
+  	
+
+    <a href='https://nbulischeck.io//tags'>Tags</a>
+
+	
+		<a href="https://nbulischeck.io/index.xml">RSS</a>
+	
+</nav>
+
+    <section id="wrapper">
+        
+        
+<article class="post">
+    <header>
+        <h1>An Introduction to RSA</h1>
+        <h2 class="subtitle">A walkthrough of the math behind RSA encryption and decryption</h2>
+        <h2 class="headline">
+        December 6, 2019
+        <br>
+          
+            
+              
+              <a href="https://nbulischeck.io/tags/python">python</a>
+            
+               | 
+              <a href="https://nbulischeck.io/tags/crypto">crypto</a>
+            
+          
+        </h2>
+    </header>
+    <section id="post-body">
+        <h1 id="public-key-cryptography">Public Key Cryptography</h1>
+
+<p>In public key cryptography, users generate a public and private keypair. The public key is used to encrypt a message and the private key is used to decrypt a message. The public key is meant to be shared with everyone and the private key is meant to be kept securely. <strong>If the private key is ever compromised, all previous messages encrypted via the user's public key can be decrypted!</strong></p>
+
+<h2 id="rsa">RSA</h2>
+
+<p>RSA (Rivest–Shamir–Adleman) is a widely adopted public-key cryptosystem. RSA is commonly used today as one of the cipher suites in Transport Layer Security (TLS). You'll typically find it used along <a href="https://en.wikipedia.org/wiki/Elliptic-curve_Diffie%E2%80%93Hellman">ECDHE</a> as the piece of cryptography that signs the exchange between your browser and the website you're connecting to.</p>
+
+<blockquote>
+<p><strong>Note</strong>: All mathematical formulas in this post will be for Plain (also called &quot;Textbook&quot;) RSA. Secure implementations of RSA include <strong>padding</strong> for which there is a section below. All python examples will be implemented securely.</p>
+</blockquote>
+
+<h3 id="rsa-key-generation">RSA Key Generation</h3>
+
+<p>RSA key generation is fairly simple. It's mostly multiplication and exponentiation. The whole basis of RSA keys is that choosing two numbers, <span  class="math">\(p\)</span> and <span  class="math">\(q\)</span>, and multiplying them together is <em>very easy</em>, while trying to figure out what two numbers multiply together to form <span  class="math">\(n\)</span> is <em>very hard</em>.</p>
+
+<p>As a quick example, if I were to give you two prime numbers, <span  class="math">\(7\)</span> and <span  class="math">\(13\)</span>, and asked you to multiply them, you'd figure out the answer quite fast. Now if I gave you the number <span  class="math">\(91\)</span> and said, &quot;What two prime numbers multiply together to create 91?&quot;, you would take considerably longer relative to the first scenario.</p>
+
+<h4 id="mathematically">Mathematically</h4>
+
+<ol>
+<li>Choose two distinct prime numbers <span  class="math">\(p\)</span> and <span  class="math">\(q\)</span>.</li>
+<li>Compute <span  class="math">\(n = pq\)</span>.</li>
+<li>Compute <span  class="math">\(\lambda(n)\)</span>, where <span  class="math">\(\lambda\)</span> is <a href="https://en.wikipedia.org/wiki/Carmichael%27s_totient_function">Carmichael's totient function</a>.
+
+<ul>
+<li>This sounds complicated, but in theory it's just <span  class="math">\(\lambda(n) = (p - 1) * (q - 1)\)</span></li>
+</ul></li>
+<li>Choose an integer <span  class="math">\(e\)</span> such that <span  class="math">\(1 \lt e \lt \lambda(n)\)</span> and <span  class="math">\(\gcd(e, \lambda(n)) = 1\)</span>.
+
+<ul>
+<li><strong>This is <em>almost</em> always 3 (for less powerful devices) or 65,537.</strong></li>
+<li><span  class="math">\(e\)</span> is the public key exponent.</li>
+</ul></li>
+<li>Determine <span  class="math">\(d\)</span> as <span  class="math">\(d \equiv e^{-1} \pmod{\lambda(n)}\)</span>
+
+<ul>
+<li><span  class="math">\(d\)</span> is the private key exponent. <strong><span  class="math">\((d)\)</span> is kept secret and never distributed.</strong><span  class="math">\(\footnote{1}\)</span></li>
+</ul></li>
+</ol>
+
+<p>The public key consists of <span  class="math">\(n\)</span> and <span  class="math">\(e\)</span>. The private key consists of <span  class="math">\(n\)</span> and <span  class="math">\(d\)</span>.</p>
+
+<h4 id="python-implementation">Python Implementation</h4>
+
+<p>With the <a href="https://cryptography.io">Cryptography</a> library, you can skip all of the math and quickly generate secure RSA keypairs:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#f92672">from</span> cryptography.hazmat.backends <span style="color:#f92672">import</span> default_backend
+<span style="color:#f92672">from</span> cryptography.hazmat.primitives <span style="color:#f92672">import</span> serialization
+<span style="color:#f92672">from</span> cryptography.hazmat.primitives.asymmetric <span style="color:#f92672">import</span> rsa
+
+private_key <span style="color:#f92672">=</span> rsa<span style="color:#f92672">.</span>generate_private_key(
+    public_exponent<span style="color:#f92672">=</span><span style="color:#ae81ff">65537</span>,
+    key_size<span style="color:#f92672">=</span><span style="color:#ae81ff">2048</span>,
+    backend<span style="color:#f92672">=</span>default_backend()
+)
+public_key <span style="color:#f92672">=</span> private_key<span style="color:#f92672">.</span>public_key()
+
+pem <span style="color:#f92672">=</span> public_key<span style="color:#f92672">.</span>public_bytes(
+    encoding<span style="color:#f92672">=</span>serialization<span style="color:#f92672">.</span>Encoding<span style="color:#f92672">.</span>PEM,
+    format<span style="color:#f92672">=</span>serialization<span style="color:#f92672">.</span>PublicFormat<span style="color:#f92672">.</span>SubjectPublicKeyInfo
+)</code></pre></div>
+<h3 id="key-distribution">Key Distribution</h3>
+
+<p>Suppose that Bob wants to send a message to Alice. Bob must first recieve Alice's public key to encrypt the message, and upon receipt, Alice will use her private key to decrypt the message. Alice will first send her public key <span  class="math">\((n, e)\)</span> to Bob via a reliable, but not necessarily secret route. Bob must be sure that he is getting Alice's key (and not an attacker's), but it is not a requirement that Alice's key must be hidden from anyone. <strong>Alice's private key is never distributed.</strong></p>
+
+<h3 id="rsa-encryption">RSA Encryption</h3>
+
+<p>Upon receipt of Alice's public key, Bob will turn his message into an integer <span  class="math">\(m\)</span>, such that <span  class="math">\(0 \leq m \lt n\)</span>. He then computes the ciphertext <span  class="math">\(c\)</span> using Alice's public key <span  class="math">\(e\)</span>:</p>
+
+<p><span  class="math">\[c \equiv m^e \pmod{n}\]</span></p>
+
+<h4 id="padding">Padding</h4>
+
+<p>In order for a message to be securely converted into a ciphertext, it must be armored first. This armoring is more commonly referred to as padding which leads some to believe it is optional when <a href="https://rdist.root.org/2009/10/06/why-rsa-encryption-padding-is-critical/">that couldn't be farther from the truth</a>. The most commonly used padding scheme is <a href="https://en.wikipedia.org/wiki/Optimal_asymmetric_encryption_padding">OAEP</a>. Before OAEP, RSA encryption with padding as described in PKCS#1v1.5 was used. <a href="https://cryptosense.com/blog/why-pkcs1v1-5-encryption-should-be-put-out-of-our-misery/">This has been known to be insecure</a> since 1998 as described in Bleichenbacher's CRYPTO 98 paper called &quot;<a href="http://archiv.infsec.ethz.ch/education/fs08/secsem/bleichenbacher98.pdf">Chosen Ciphertext Attacks Against Protocols Based on the RSA Encryption Standard PKCS #1</a>&quot;.</p>
+
+<h5 id="python-implementation-1">Python Implementation</h5>
+
+<p>The following code uses the outdated Python library <a href="https://pypi.org/project/pycrypto/">PyCrypto</a> and demonstrates an encryption and padding scheme that is vulnerable to the attack in Bleichenbacher's paper:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-Python" data-lang="Python"><span style="color:#f92672">from</span> Crypto.PublicKey <span style="color:#f92672">import</span> RSA
+<span style="color:#f92672">from</span> Crypto.Cipher <span style="color:#f92672">import</span> PKCS1_v1_5
+
+message <span style="color:#f92672">=</span> <span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">Hello, world!</span><span style="color:#e6db74">&#34;</span>
+
+key <span style="color:#f92672">=</span> RSA<span style="color:#f92672">.</span>generate(<span style="color:#ae81ff">2048</span>)
+cipher <span style="color:#f92672">=</span> PKCS1_v1_5<span style="color:#f92672">.</span>new(key)
+ciphertext <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(message<span style="color:#f92672">.</span>encode())</code></pre></div>
+<p>Similar to the other examples, the following secure code uses the Cryptography python package as well as the OAEP padding scheme:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-Python" data-lang="Python"><span style="color:#f92672">from</span> cryptography.hazmat.primitives <span style="color:#f92672">import</span> hashes
+<span style="color:#f92672">from</span> cryptography.hazmat.primitives.asymmetric <span style="color:#f92672">import</span> padding
+
+message <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">Attack at Dawn</span><span style="color:#e6db74">&#34;</span>
+ciphertext <span style="color:#f92672">=</span> public_key<span style="color:#f92672">.</span>encrypt(
+    message,
+    padding<span style="color:#f92672">.</span>OAEP(
+        mgf<span style="color:#f92672">=</span>padding<span style="color:#f92672">.</span>MGF1(algorithm<span style="color:#f92672">=</span>hashes<span style="color:#f92672">.</span>SHA256()),
+        algorithm<span style="color:#f92672">=</span>hashes<span style="color:#f92672">.</span>SHA256(),
+        label<span style="color:#f92672">=</span>None
+    )
+)</code></pre></div>
+<h3 id="rsa-decryption">RSA Decryption</h3>
+
+<p>Upon receipt of the ciphertext, Alice can recover <span  class="math">\(m\)</span> from <span  class="math">\(c\)</span> by using her private key exponent <span  class="math">\(d\)</span>:</p>
+
+<p><span  class="math">\[c^d \equiv (m^e)^d \equiv m \pmod n\]</span></p>
+
+<h5 id="python-implementation-2">Python Implementation</h5>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-Python" data-lang="Python"><span style="color:#f92672">from</span> cryptography.hazmat.primitives <span style="color:#f92672">import</span> hashes
+<span style="color:#f92672">from</span> cryptography.hazmat.primitives.asymmetric <span style="color:#f92672">import</span> padding
+
+plaintext <span style="color:#f92672">=</span> private_key<span style="color:#f92672">.</span>decrypt(
+    ciphertext,
+    padding<span style="color:#f92672">.</span>OAEP(
+        mgf<span style="color:#f92672">=</span>padding<span style="color:#f92672">.</span>MGF1(algorithm<span style="color:#f92672">=</span>hashes<span style="color:#f92672">.</span>SHA256()),
+        algorithm<span style="color:#f92672">=</span>hashes<span style="color:#f92672">.</span>SHA256(),
+        label<span style="color:#f92672">=</span>None
+    )
+)</code></pre></div>
+<h3 id="rsa-message-signing">RSA Message Signing</h3>
+
+<p>RSA message signing solves the problem where Alice wants to send Bob a message, but Bob wants to be able to verify that Alice is the one who sent the message. Normally, anyone can get Bob's public key and send him the encrypted message, but Alice can verify that she meant the message by using her private key and a cryptographic hash function to sign the message. Bob can then take the signature and Alice's public key to verify that the sender of the message had to control Alice's private key.</p>
+
+<p>Message signing is started by using a hash function on the message because the RSA operation can't handle messages longer than the modulus size. &quot;<a href="https://crypto.stackexchange.com/a/9897/32614">That means that if you have a 2048 bit RSA key, you would be unable to directly sign any messages longer than 256 bytes long (and even that would have problems, because of lack of padding)</a>&quot;.</p>
+
+<h4 id="message-signing">Message Signing</h4>
+
+<ol>
+<li>Alice creates a hash of the message:
+
+<ul>
+<li><span  class="math">\(h = \text{hash}(m)\)</span></li>
+</ul></li>
+<li>Alice raises it to the power of <span  class="math">\(d ~ \text{mod} ~ n\)</span>:
+
+<ul>
+<li><span  class="math">\(s = h^d \pmod n\)</span></li>
+</ul></li>
+<li>Alice attaches <span  class="math">\(s\)</span> to her message to Bob and sends it.</li>
+</ol>
+
+<h4 id="message-verification">Message Verification</h4>
+
+<ol>
+<li>Bob receives the message and signature from Alice.</li>
+<li>Bob creates a hash of the message using the same hashing algorithm as Alice:
+
+<ul>
+<li><span  class="math">\(h = \text{hash}(m)\)</span></li>
+</ul></li>
+<li>Bob raises the signature to the power of <span  class="math">\(e ~ \text{mod} ~ n\)</span>:
+
+<ul>
+<li><span  class="math">\(h = s^e \pmod n\)</span></li>
+</ul></li>
+<li>Bob then compares the resulting hash value with his calculated hash from step 2.</li>
+<li>If the hashes match, then he knows that the sender had control of Alice's private key and the message has not been tampered with.</li>
+</ol>
+
+<p>This process works because multiplication is commutative.</p>
+
+<p><span  class="math">\[(h^e)^d = h^{ed} = h^{de} = (h^d)^e \equiv h \pmod n\]</span></p>
+
+<h4 id="python-implementation-3">Python Implementation</h4>
+
+<p>To sign a message:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-Python" data-lang="Python"><span style="color:#f92672">from</span> cryptography.hazmat.primitives <span style="color:#f92672">import</span> hashes
+<span style="color:#f92672">from</span> cryptography.hazmat.primitives.asymmetric <span style="color:#f92672">import</span> padding
+
+signature <span style="color:#f92672">=</span> private_key<span style="color:#f92672">.</span>sign(
+    message,
+    padding<span style="color:#f92672">.</span>PSS(
+        mgf<span style="color:#f92672">=</span>padding<span style="color:#f92672">.</span>MGF1(hashes<span style="color:#f92672">.</span>SHA256()),
+        salt_length<span style="color:#f92672">=</span>padding<span style="color:#f92672">.</span>PSS<span style="color:#f92672">.</span>MAX_LENGTH
+    ),
+    hashes<span style="color:#f92672">.</span>SHA256()
+)</code></pre></div>
+<p>To verify the signature:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-Python" data-lang="Python"><span style="color:#f92672">from</span> cryptography.exceptions <span style="color:#f92672">import</span> InvalidSignature
+<span style="color:#f92672">from</span> cryptography.hazmat.primitives <span style="color:#f92672">import</span> hashes
+<span style="color:#f92672">from</span> cryptography.hazmat.primitives.asymmetric <span style="color:#f92672">import</span> padding
+
+<span style="color:#66d9ef">try</span>:
+    public_key<span style="color:#f92672">.</span>verify(
+        signature,
+        message,
+        padding<span style="color:#f92672">.</span>PSS(
+            mgf<span style="color:#f92672">=</span>padding<span style="color:#f92672">.</span>MGF1(hashes<span style="color:#f92672">.</span>SHA256()),
+            salt_length<span style="color:#f92672">=</span>padding<span style="color:#f92672">.</span>PSS<span style="color:#f92672">.</span>MAX_LENGTH
+        ),
+        hashes<span style="color:#f92672">.</span>SHA256()
+    )
+<span style="color:#66d9ef">except</span> InvalidSignature:
+    <span style="color:#66d9ef">print</span>(<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">Signature is not valid!</span><span style="color:#e6db74">&#34;</span>)</code></pre></div>
+<h3 id="practical-attacks-on-plain-rsa">Practical Attacks on Plain RSA</h3>
+
+<p>This section will detail a few of the attacks on Plain (Textbook) RSA. These are among the many very good reasons to always introduce padding into your RSA encryption/decryption routine.</p>
+
+<h4 id="small-message-recovery">Small Message Recovery</h4>
+
+<p>When <span  class="math">\(e\)</span> is small and the message <span  class="math">\(m\)</span> is such that <span  class="math">\(m \lt n^{1/e}\)</span>, then the encryption:</p>
+
+<p><span  class="math">\[c = m^e \pmod n = m^{e}\]</span></p>
+
+<p>has no modular reduction. A trivial recovery of the message involves computing <span  class="math">\(\sqrt[e]{c}\)</span>.</p>
+
+<p>For example, let <span  class="math">\(e = 3\)</span>, <span  class="math">\(m = 42\)</span>, and <span  class="math">\(n = 121411\)</span>.</p>
+
+<p>The ciphertext can be computed as: <span  class="math">\(c = 42^3 \pmod{121411} = 42^{3} = 74088\)</span></p>
+
+<p>The plaintext can then be recovered via: <span  class="math">\(\sqrt[3]{c} = \sqrt[3]{74088} = 42 = m\)</span></p>
+
+<h4 id="multiple-receiver-message-recovery">Multiple Receiver Message Recovery</h4>
+
+<p>If the same message is encrypted, sent to <span  class="math">\(e\)</span> or more recipients, and the receivers share the same exponent <span  class="math">\(e\)</span>, then it is easy to decrypt the original message using the <a href="https://en.wikipedia.org/wiki/Chinese_remainder_theorem">Chinese remainder theorem</a>.</p>
+
+<p>For example, let <span  class="math">\(e = 3\)</span>.</p>
+
+<p>Encrypting and sending a message <span  class="math">\(m\)</span> to <span  class="math">\(3\)</span> recipients yields:</p>
+
+<p><span  class="math">\[c \equiv m^{3} \pmod{n_a}\]</span></p>
+
+<p><span  class="math">\[c \equiv m^{3} \pmod{n_b}\]</span></p>
+
+<p><span  class="math">\[c \equiv m^{3} \pmod{n_c}\]</span></p>
+
+<p>The algorithm to find <span  class="math">\(c\)</span> is:</p>
+
+<p><span  class="math">\[c = c_a (n_b \cdot n_c) [ (n_b \cdot n_c)^{-1} ]_{n_a} + c_b (n_a \cdot n_c) [ (n_a \cdot n_c)^{-1} ]_{n_b} + c_c (n_a \cdot n_b) [ (n_a \cdot n_b)^{-1} ]_{n_c}\]</span></p>
+
+<p>where <span  class="math">\([ a^{-1} ]_{b}\)</span> is the modular inverse of a and b.</p>
+
+<p>With a message of <span  class="math">\(m = 1337\)</span> and recipients of <span  class="math">\(n_a = 3337, n_b = 3551, n_c = 3599\)</span>:</p>
+
+<p><span  class="math">\[c_a = 1337^{3} ~ \text{mod} ~ 3337 = 331\]</span></p>
+
+<p><span  class="math">\[c_b = 1337^{3} ~ \text{mod} ~ 3551 = 509\]</span></p>
+
+<p><span  class="math">\[c_c = 1337^{3} ~ \text{mod} ~ 3599 = 2620\]</span></p>
+
+<p>We now have a set of congruences to solve for:</p>
+
+<p><span  class="math">\[c \equiv 331 \pmod{3337}\]</span></p>
+
+<p><span  class="math">\[c \equiv 509 \pmod{3551}\]</span></p>
+
+<p><span  class="math">\[c \equiv 2620 \pmod{3599}\]</span></p>
+
+<p>We can now use the equation for <span  class="math">\(c\)</span> above:</p>
+
+<p><span  class="math">\[t_a = c_a (n_b \cdot n_c) [ (n_b \cdot n_c)^{-1} ]_{n_a} = 331(3551 * 3599)[(3551 * 3599)^{-1}]_{3337} = 1324051416547\]</span></p>
+
+<p><span  class="math">\[t_b = c_b (n_a \cdot n_c) [ (n_a \cdot n_c)^{-1} ]_{n_b} = 509(3337 * 3599)[(3337 * 3599)^{-1}]_{3551} = 10141500622953\]</span></p>
+
+<p><span  class="math">\[t_c = c_c (n_a \cdot n_b) [ (n_a \cdot n_b)^{-1} ]_{n_c} = 2620(3337 * 3551)[(3337 * 3551)^{-1}]_{3599} = 49052964305200\]</span></p>
+
+<p><span  class="math">\[\therefore c = t_a + t_b + t_c ~ \text{mod} ~ (n_a \cdot n_b \cdot n_c) = 2389979753\]</span></p>
+
+<p>Computing for <span  class="math">\(m\)</span>, we get <span  class="math">\(m = \sqrt[3]{c} = \sqrt[3]{2389979753} = 1337 = m\)</span></p>
+
+<p>47*71 = 3337, 53*67 = 3551, 59*61 = 3599</p>
+
+<h5 id="python-implementation-4">Python Implementation</h5>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-Python" data-lang="Python">m <span style="color:#f92672">=</span> <span style="color:#ae81ff">1337</span>
+e <span style="color:#f92672">=</span> <span style="color:#ae81ff">3</span>
+n_list <span style="color:#f92672">=</span> [<span style="color:#ae81ff">3337</span>, <span style="color:#ae81ff">3551</span>, <span style="color:#ae81ff">3599</span>]
+n_combs <span style="color:#f92672">=</span> list(combinations(n_list, e<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>))[::<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>]
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">eth_root</span>(c, e):
+    <span style="color:#66d9ef">return</span> round(abs(c) <span style="color:#f92672">*</span><span style="color:#f92672">*</span> (<span style="color:#ae81ff">1.</span> <span style="color:#f92672">/</span> e))
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">egcd</span>(a, b):
+    <span style="color:#66d9ef">if</span> a <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+        <span style="color:#66d9ef">return</span> (b, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">1</span>)
+    <span style="color:#66d9ef">else</span>:
+        g, y, x <span style="color:#f92672">=</span> egcd(b <span style="color:#f92672">%</span> a, a)
+        <span style="color:#66d9ef">return</span> (g, x <span style="color:#f92672">-</span> (b <span style="color:#f92672">/</span><span style="color:#f92672">/</span> a) <span style="color:#f92672">*</span> y, y)
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">modinv</span>(a, m):
+    g, x, y <span style="color:#f92672">=</span> egcd(a, m)
+    <span style="color:#66d9ef">if</span> g <span style="color:#f92672">!=</span> <span style="color:#ae81ff">1</span>:
+        <span style="color:#66d9ef">raise</span> <span style="color:#a6e22e">Exception</span>(<span style="color:#e6db74"></span><span style="color:#e6db74">&#39;</span><span style="color:#e6db74">modular inverse does not exist</span><span style="color:#e6db74">&#39;</span>)
+    <span style="color:#66d9ef">else</span>:
+        <span style="color:#66d9ef">return</span> x <span style="color:#f92672">%</span> m
+
+<span style="color:#75715e"># Generate Ciphertexts</span>
+cs <span style="color:#f92672">=</span> []
+<span style="color:#66d9ef">for</span> i, n <span style="color:#f92672">in</span> enumerate(n_list):
+    cs<span style="color:#f92672">.</span>append(m<span style="color:#f92672">*</span><span style="color:#f92672">*</span>e <span style="color:#f92672">%</span> n)
+
+<span style="color:#75715e"># Generate Equations</span>
+ts <span style="color:#f92672">=</span> []
+<span style="color:#66d9ef">for</span> i, terms <span style="color:#f92672">in</span> enumerate(n_combs):
+    eq_part1 <span style="color:#f92672">=</span> cs[i] <span style="color:#f92672">*</span> (terms[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">*</span> terms[<span style="color:#ae81ff">1</span>])
+    eq_part2 <span style="color:#f92672">=</span> modinv(terms[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">*</span> terms[<span style="color:#ae81ff">1</span>], n_list[i])
+    ts<span style="color:#f92672">.</span>append(eq_part1 <span style="color:#f92672">*</span> eq_part2)
+
+<span style="color:#75715e"># Recover the Message</span>
+c <span style="color:#f92672">=</span> sum(ts) <span style="color:#f92672">%</span> prod(n_list)
+m <span style="color:#f92672">=</span> eth_root(c, e)</code></pre></div>
+<h3 id="practical-attacks-on-rsa">Practical Attacks on RSA</h3>
+
+<h4 id="general-number-field-sieves">General Number Field Sieves</h4>
+
+<p>The <a href="https://en.wikipedia.org/wiki/General_number_field_sieve">general number field sieve</a> is the most efficient classical algorithm known for factoring integers larger than <span  class="math">\(10^{100}\)</span>. In 2009, a number field sieve was used to factor a 768-bit RSA number (<span  class="math">\(n\)</span>) in about 1500 years of computing time on current hardware. &quot;<a href="https://eprint.iacr.org/2010/006.pdf">Factoring a 1024-bit RSA modulus would be about a thousand times harder</a>&quot;. To date, this is the largest factored RSA number. With the rise of quantum computers on our horizon, Shor's Algorithm will be used in place of these classical methods.</p>
+
+<h4 id="shors-algorithm">Shor's Algorithm</h4>
+
+<p><a href="https://en.wikipedia.org/wiki/Shor%27s_algorithm">Shor's algorithm</a> is a quantum computer algorithm for integer factorization. In short, Shor's algorithm is almost exponentially faster than the most efficient known classical factoring algorithm, the general number field sieve. As noted in previous sections, the basis of RSA is the factorization problem, so an algorithm that greatly increases the ability to factor a number poses a threat to RSA.</p>
+
+<p>I won't dive into Shor's algorithm in this post, but below is a video by MinutePhysics which contains an excellent walkthrough of it and the implications on current forms of cryptography.</p>
+
+
+	
+
+
+
+    
+
+
+
+    
+
+
+<div style="position: relative; padding-bottom: 56.25%; margin-bottom: 20px; overflow: hidden;">
+    <iframe style="position: absolute; width: 100%; height: 100%;"
+        src="http://www.youtube.com/embed/lvTqbM5Dq4Q" allowfullscreen frameborder="0">
+    </iframe>
+</div>
+
+
+<h4 id="bleichenbachers-rsa-pkcs-1v15-padding-oracle">Bleichenbacher's RSA PKCS #1v1.5 Padding Oracle</h4>
+
+<p>Given an encrypted ciphertext and a padding oracle (a function whose input is a ciphertext and output reveals information about the padding), decrypt the ciphertext using a <a href="https://en.wikipedia.org/wiki/Padding_oracle_attack">padding oracle attack</a>.</p>
+
+<p>For this challenge, I would recommend the cryptanalib from the Featherduster project by NCCGroup as it practically automates the entire attack for you. All you have to write is a padding oracle wrapper. I made a challenge based off of this attack which <a href="https://github.com/CUCyber/cuctf-challenges/tree/master/solutions/cryptography/SMS">you can read a writeup of here</a>.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-Python" data-lang="Python"><span style="color:#f92672">import</span> cryptanalib
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">oracle</span>(ciphertext):
+   plaintext <span style="color:#f92672">=</span> key<span style="color:#f92672">.</span>decrypt(ciphertext)
+   <span style="color:#66d9ef">return</span> plaintext<span style="color:#f92672">.</span>encode(<span style="color:#e6db74"></span><span style="color:#e6db74">&#39;</span><span style="color:#e6db74">hex</span><span style="color:#e6db74">&#39;</span>)[:<span style="color:#ae81ff">2</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74"></span><span style="color:#e6db74">&#39;</span><span style="color:#e6db74">02</span><span style="color:#e6db74">&#39;</span>
+
+plaintext <span style="color:#f92672">=</span> cryptanalib<span style="color:#f92672">.</span>bb98_padding_oracle(
+    ciphertext,
+    oracle,
+    key<span style="color:#f92672">.</span>e,
+    key<span style="color:#f92672">.</span>n,
+    verbose<span style="color:#f92672">=</span>True,
+    debug<span style="color:#f92672">=</span>True
+)</code></pre></div>
+    </section>
+</article>
+
+
+
+
+
+        
+            <footer id="footer">
+    
+        <div id="social">
+
+	
+	
+    <a class="symbol" href="https://www.github.com/nbulischeck">
+        <i class="fa fa-github"></i>
+    </a>
+    
+    <a class="symbol" href="https://www.twitter.com/nbulischeck">
+        <i class="fa fa-twitter"></i>
+    </a>
+    
+
+
+</div>
+
+    
+    <p class="small">
+    
+        © Copyright 2019 Nick Bulischeck
+    
+    </p>
+</footer>
+
+        
+    </section>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://nbulischeck.io/js/main.js"></script>
+<script src="https://nbulischeck.io/js/highlight.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+	ga('create', 'UA-154144453-1', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+
+
+</body>
+</html>

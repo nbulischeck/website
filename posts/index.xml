@@ -13,10 +13,10 @@
     
     <item>
       <title>An Introduction to RSA</title>
-      <link>https://nbulischeck.io/posts/rsa/</link>
+      <link>https://nbulischeck.io/posts/introduction-to-rsa/</link>
       <pubDate>Fri, 06 Dec 2019 00:00:00 +0000</pubDate>
       
-      <guid>https://nbulischeck.io/posts/rsa/</guid>
+      <guid>https://nbulischeck.io/posts/introduction-to-rsa/</guid>
       <description>Public Key Cryptography In public key cryptography, users generate a public and private keypair. The public key is used to encrypt a message and the private key is used to decrypt a message. The public key is meant to be shared with everyone and the private key is meant to be kept securely. If the private key is ever compromised, all previous messages encrypted via the user&#39;s public key can be decrypted!</description>
     </item>
     

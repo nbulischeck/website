@@ -242,7 +242,10 @@
 <p>If all that sounds too complicated, think of a Netfilter hook as a bouncer of a club. The bouncer is only allowed to let club-goers wearing green badges to go through (ACCEPT), but kicks out anyone wearing red badges (DENY/DROP). He also has the option to change anyone's badge color if he chooses. Suppose someone is wearing a red badge, but the bouncer wants to let them in anyway. The bouncer can intercept this person at the door and alter their badge to be green. This is known as packet &ldquo;mangling&rdquo;.</p>
 <p>For our case, we don't need to mangle any packets, but for the reader this may be useful. With this concept, we are allowed to check any packets that are coming through to see if they qualify for our criteria. We call the packets that qualify &ldquo;trigger packets&rdquo; because they trigger some action in our code to occur.</p>
 <p>Netfilter hooks are great because you don't need to expose any ports on the host to get the information. If you want a more in-depth look at Netfilter you can <a href="https://www.landhb.me/posts/bODdK/port-knocking-with-netfilter-kernel-modules/">read the article here</a> or the <a href="https://www.netfilter.org/documentation/HOWTO/netfilter-hacking-HOWTO-3.html">Netfilter documentation</a>.</p>
-<p><img src="/images/debugfs/netfilter-hooks.png" alt="Netfilter Routing"></p>
+<div style="text-align: center;">
+    <img src="/images/debugfs/netfilter-hooks.png" alt="Netfilter Routing">
+</div>
+
 <p>When I use Netfilter, I will be intercepting packets in the earliest stage, pre-routing.</p>
 <h3 id="esp-packets">ESP Packets</h3>
 <p>The packet I chose to use for this is called ESP. <a href="https://tools.ietf.org/html/rfc4303">ESP or Encapsulating Security Payload Packets</a> were designed to provide a mix of security services to IPv4 and IPv6. It's a fairly standard part of IPSec and the data it transmits is supposed to be encrypted. This means you can put an encrypted version of your script on the client and then send it to the server to decrypt and run.</p>
@@ -346,7 +349,10 @@ ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">stru
 </code></pre></div><h2 id="mitigation">Mitigation</h2>
 <p>The simplest mitigation for this is to remount debugfs as <code>noexec</code> so that execution of files on it is prohibited. To my knowledge, there is no reason to have it mounted the way it is by default. However, this could be trivially bypassed. An example of execution no longer working after remounting with <code>noexec</code> can be found in the screenshot below.</p>
 <p>For kernel modules in general, module signing should be required by default. Module signing involves cryptographically signing kernel modules during installation and then checking the signature upon loading it into the kernel. &ldquo;<a href="https://www.kernel.org/doc/html/v4.16/admin-guide/module-signing.html">This allows increased kernel security by disallowing the loading of unsigned modules or modules signed with an invalid key. Module signing increases security by making it harder to load a malicious module into the kernel.</a>&rdquo;</p>
-<p><img src="/images/debugfs/debugfs-noexec.png" alt="Debugfs with No Execute"></p>
+<div style="text-align: center;">
+    <img src="/images/debugfs/debugfs-noexec.png" alt="Debugfs with No Execute">
+</div>
+
 <pre><code># Mounted without noexec (default)
 cat /etc/mtab | grep &quot;debugfs&quot;
 ls -la /tmp/i_am_groot
