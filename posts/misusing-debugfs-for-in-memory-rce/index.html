@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="author" content="Nick Bulischeck">
 <meta name="description" content="Yet Another Cybersecurity Blog">
-<meta name="generator" content="Hugo 0.60.1" />
+<meta name="generator" content="Hugo 0.63.2" />
 <title>Misusing debugfs for In-Memory Code Execution</title>
 <link rel="shortcut icon" href="https://nbulischeck.io/images/favicon.ico">
 <link rel="stylesheet" href="https://nbulischeck.io/css/style.css">
@@ -97,13 +97,13 @@
     <section id="post-body">
         <h1 id="introduction">Introduction</h1>
 <p><a href="https://www.kernel.org/doc/Documentation/filesystems/debugfs.txt">Debugfs is a simple-to-use RAM-based file system specially designed for kernel debugging purposes</a>. It was released with version 2.6.10-rc3 and written by Greg Kroah-Hartman. In this post, I will be showing you how to use debugfs and Netfilter hooks to create a Loadable Kernel Module capable of executing code remotely entirely in RAM.</p>
-<p>An attacker's ideal process would be to first gain unprivileged access to the target, perform a local privilege escalation to gain root access, insert the kernel module onto the machine as a method of persistence, and then pivot to the next target.</p>
+<p>An attacker&rsquo;s ideal process would be to first gain unprivileged access to the target, perform a local privilege escalation to gain root access, insert the kernel module onto the machine as a method of persistence, and then pivot to the next target.</p>
 <blockquote>
 <p><strong>Note</strong>: The following is tested and working on clean images of Ubuntu 12.04 (3.13.0-32), Ubuntu 14.04 (4.4.0-31), Ubuntu 16.04 (4.13.0-36). All development was done on Arch throughout a few of the most recent kernel versions (4.16+).</p>
 </blockquote>
 <h2 id="practicality-of-a-debugfs-rce">Practicality of a debugfs RCE</h2>
 <p>When diving into how practical using debugfs is, I needed to see how prevalent it was across a variety of systems.</p>
-<p>For every Ubuntu release from 6.06 to 18.04 and CentOS versions 6 and 7, I created a VM and checked the three statements below. This chart details the answers to each of the questions for each distro. The main thing I was looking for was to see if it was even possible to mount the device in the first place. If that was not possible, then we won't be able to use debugfs in our backdoor.</p>
+<p>For every Ubuntu release from 6.06 to 18.04 and CentOS versions 6 and 7, I created a VM and checked the three statements below. This chart details the answers to each of the questions for each distro. The main thing I was looking for was to see if it was even possible to mount the device in the first place. If that was not possible, then we won&rsquo;t be able to use debugfs in our backdoor.</p>
 <p>Fortunately, every distro, except Ubuntu 6.06, was able to mount debugfs. Every Ubuntu version from 10.04 and on as well as CentOS 7 had it mounted by default.</p>
 <ol>
 <li>Present: Is /sys/kernel/debug/ present on first load?</li>
@@ -186,8 +186,8 @@
 <h2 id="executing-code-on-debugfs">Executing code on debugfs</h2>
 <p>Once I determined that debugfs is prevalent, I wrote a <a href="https://gist.github.com/nbulischeck/37a86f4db9157372c016abf2235b424d">simple proof of concept</a> to see if you can execute files from it. It is a filesystem after all.</p>
 <p>The debugfs API is actually extremely simple. The main functions you would want to use are: <code>debugfs_initialized</code> - check if debugfs is registered, <code>debugfs_create_blob</code> - create a file for a binary object of arbitrary size, and <code>debugfs_remove</code> - delete the debugfs file.</p>
-<p>In the proof of concept, I didn't use <code>debugfs_initialized</code> because I know that it's present, but it is a good sanity-check.</p>
-<p>To create the file, I used <code>debugfs_create_blob</code> as opposed to <code>debugfs_create_file</code> as my initial goal was to execute ELF binaries. Unfortunately I wasn't able to get that to work - more on that later. All you have to do to create a file is assign the blob pointer to a buffer that holds your content and give it a length. It's easier to think of this as an abstraction to writing your own file operations like you would do if you were designing a character device.</p>
+<p>In the proof of concept, I didn&rsquo;t use <code>debugfs_initialized</code> because I know that it&rsquo;s present, but it is a good sanity-check.</p>
+<p>To create the file, I used <code>debugfs_create_blob</code> as opposed to <code>debugfs_create_file</code> as my initial goal was to execute ELF binaries. Unfortunately I wasn&rsquo;t able to get that to work - more on that later. All you have to do to create a file is assign the blob pointer to a buffer that holds your content and give it a length. It&rsquo;s easier to think of this as an abstraction to writing your own file operations like you would do if you were designing a character device.</p>
 <p>The following code should be very self-explanatory. <code>dfs</code> holds the file entry and <code>myblob</code> holds the file contents (pointer to the buffer holding the program and buffer length). I simply call the <code>debugfs_create_blob</code> function after the setup with the name of the file, the mode of the file (permissions), <code>NULL</code> parent, and lastly the data.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">struct</span> dentry <span style="color:#f92672">*</span>dfs <span style="color:#f92672">=</span> NULL;
 <span style="color:#66d9ef">struct</span> debugfs_blob_wrapper <span style="color:#f92672">*</span>myblob <span style="color:#f92672">=</span> NULL;
@@ -213,7 +213,7 @@
 	}
 	<span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
 }
-</code></pre></div><p>Deleting a file in debugfs is as simple as it can get. One call to <code>debugfs_remove</code> and the file is gone. Wrapping an error check around it just to be sure and it's 3 lines.</p>
+</code></pre></div><p>Deleting a file in debugfs is as simple as it can get. One call to <code>debugfs_remove</code> and the file is gone. Wrapping an error check around it just to be sure and it&rsquo;s 3 lines.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">destroy_file</span>(<span style="color:#66d9ef">void</span>){
 	<span style="color:#66d9ef">if</span> (dfs){
 		debugfs_remove(dfs);
@@ -238,17 +238,17 @@
 }
 </code></pre></div><p>I would now recommend you try <a href="https://gist.github.com/nbulischeck/37a86f4db9157372c016abf2235b424d">the PoC code</a> to get a good feel for what is being done in terms of actually executing our program. To check if it worked, run <code>ls /tmp/</code> and see if the file <code>i_am_groot</code> is present.</p>
 <h2 id="netfilter">Netfilter</h2>
-<p>We now know how our program gets executed in memory, but how do we send the code and get the kernel to run it remotely? The answer is by using Netfilter! Netfilter is a framework in the Linux kernel that allows kernel modules to register callback functions called hooks in the kernel's networking stack.</p>
-<p>If all that sounds too complicated, think of a Netfilter hook as a bouncer of a club. The bouncer is only allowed to let club-goers wearing green badges to go through (ACCEPT), but kicks out anyone wearing red badges (DENY/DROP). He also has the option to change anyone's badge color if he chooses. Suppose someone is wearing a red badge, but the bouncer wants to let them in anyway. The bouncer can intercept this person at the door and alter their badge to be green. This is known as packet &ldquo;mangling&rdquo;.</p>
-<p>For our case, we don't need to mangle any packets, but for the reader this may be useful. With this concept, we are allowed to check any packets that are coming through to see if they qualify for our criteria. We call the packets that qualify &ldquo;trigger packets&rdquo; because they trigger some action in our code to occur.</p>
-<p>Netfilter hooks are great because you don't need to expose any ports on the host to get the information. If you want a more in-depth look at Netfilter you can <a href="https://www.landhb.me/posts/bODdK/port-knocking-with-netfilter-kernel-modules/">read the article here</a> or the <a href="https://www.netfilter.org/documentation/HOWTO/netfilter-hacking-HOWTO-3.html">Netfilter documentation</a>.</p>
+<p>We now know how our program gets executed in memory, but how do we send the code and get the kernel to run it remotely? The answer is by using Netfilter! Netfilter is a framework in the Linux kernel that allows kernel modules to register callback functions called hooks in the kernel&rsquo;s networking stack.</p>
+<p>If all that sounds too complicated, think of a Netfilter hook as a bouncer of a club. The bouncer is only allowed to let club-goers wearing green badges to go through (ACCEPT), but kicks out anyone wearing red badges (DENY/DROP). He also has the option to change anyone&rsquo;s badge color if he chooses. Suppose someone is wearing a red badge, but the bouncer wants to let them in anyway. The bouncer can intercept this person at the door and alter their badge to be green. This is known as packet &ldquo;mangling&rdquo;.</p>
+<p>For our case, we don&rsquo;t need to mangle any packets, but for the reader this may be useful. With this concept, we are allowed to check any packets that are coming through to see if they qualify for our criteria. We call the packets that qualify &ldquo;trigger packets&rdquo; because they trigger some action in our code to occur.</p>
+<p>Netfilter hooks are great because you don&rsquo;t need to expose any ports on the host to get the information. If you want a more in-depth look at Netfilter you can <a href="https://www.landhb.me/posts/bODdK/port-knocking-with-netfilter-kernel-modules/">read the article here</a> or the <a href="https://www.netfilter.org/documentation/HOWTO/netfilter-hacking-HOWTO-3.html">Netfilter documentation</a>.</p>
 <div style="text-align: center;">
     <img src="/images/debugfs/netfilter-hooks.png" alt="Netfilter Routing">
 </div>
 
 <p>When I use Netfilter, I will be intercepting packets in the earliest stage, pre-routing.</p>
 <h3 id="esp-packets">ESP Packets</h3>
-<p>The packet I chose to use for this is called ESP. <a href="https://tools.ietf.org/html/rfc4303">ESP or Encapsulating Security Payload Packets</a> were designed to provide a mix of security services to IPv4 and IPv6. It's a fairly standard part of IPSec and the data it transmits is supposed to be encrypted. This means you can put an encrypted version of your script on the client and then send it to the server to decrypt and run.</p>
+<p>The packet I chose to use for this is called ESP. <a href="https://tools.ietf.org/html/rfc4303">ESP or Encapsulating Security Payload Packets</a> were designed to provide a mix of security services to IPv4 and IPv6. It&rsquo;s a fairly standard part of IPSec and the data it transmits is supposed to be encrypted. This means you can put an encrypted version of your script on the client and then send it to the server to decrypt and run.</p>
 <h3 id="netfilter-code">Netfilter Code</h3>
 <p>Netfilter hooks are extremely easy to implement. The prototype for the hook is as follows:</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">int</span> <span style="color:#a6e22e">function_name</span> (
@@ -258,7 +258,7 @@
 		<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">struct</span> net_device <span style="color:#f92672">*</span>out,
 		<span style="color:#66d9ef">int</span> (<span style="color:#f92672">*</span>okfn)(<span style="color:#66d9ef">struct</span> sk_buff <span style="color:#f92672">*</span>)
 );
-</code></pre></div><p>All those arguments aren't terribly important, so let's move on to the one you need: <code>struct sk_buff *skb</code>. <code>sk_buff</code>s get a little complicated so if you want to read more on them, you can find more information <a href="https://wiki.linuxfoundation.org/networking/sk_buff">here</a>.</p>
+</code></pre></div><p>All those arguments aren&rsquo;t terribly important, so let&rsquo;s move on to the one you need: <code>struct sk_buff *skb</code>. <code>sk_buff</code>s get a little complicated so if you want to read more on them, you can find more information <a href="https://wiki.linuxfoundation.org/networking/sk_buff">here</a>.</p>
 <p>To get the IP header of the packet, use the function <code>skb_network_header</code> and typecast it to a <code>struct iphdr *</code>.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">struct</span> iphdr <span style="color:#f92672">*</span>ip_header;
 
@@ -275,7 +275,7 @@ ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">stru
 	(esp_header<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>seq_no <span style="color:#f92672">=</span><span style="color:#f92672">=</span> TARGET_SEQ)){
 	<span style="color:#75715e">// Trigger packet arrived
 </span><span style="color:#75715e"></span>}
-</code></pre></div><p>Once you've identified the target packet, you can extract the ESP data using the struct's member <code>enc_data</code>. Ideally, this would be encrypted thus ensuring the privacy of the code you're running on the target computer, but for the sake of simplicity in the PoC I left it out.</p>
+</code></pre></div><p>Once you&rsquo;ve identified the target packet, you can extract the ESP data using the struct&rsquo;s member <code>enc_data</code>. Ideally, this would be encrypted thus ensuring the privacy of the code you&rsquo;re running on the target computer, but for the sake of simplicity in the PoC I left it out.</p>
 <p>The tricky part is that Netfilter hooks are run in a softirq context which makes them very fast, but a little delicate. Being in a softirq context allows Netfilter to process incoming packets across multiple CPUs concurrently. They cannot go to sleep and deferred work runs in an interrupt context (this is very bad for us and it requires using <a href="https://github.com/nbulischeck/debugfs-backdoor/blob/master/backdoor/state.c">delayed workqueues as seen in state.c</a>).</p>
 <p>The full code for this section can be found <a href="https://github.com/nbulischeck/debugfs-backdoor/blob/master/backdoor/nfhook.c">here</a>.</p>
 <h2 id="limitations">Limitations</h2>
@@ -305,7 +305,7 @@ ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">stru
 
     call_usermodehelper(argv[<span style="color:#ae81ff">0</span>], argv, envp, UMH_WAIT_PROC);
 }
-</code></pre></div><p>Go also works, but it's arguably not entirely in RAM as it has to make a temp file to build it and it also requires the <code>.go</code> file extension making this a little more obvious.</p>
+</code></pre></div><p>Go also works, but it&rsquo;s arguably not entirely in RAM as it has to make a temp file to build it and it also requires the <code>.go</code> file extension making this a little more obvious.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">execute_file</span>(<span style="color:#66d9ef">void</span>){
 	<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>envp[] <span style="color:#f92672">=</span> {
 		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">SHELL=/bin/bash</span><span style="color:#e6db74">&#34;</span>,
@@ -399,7 +399,7 @@ sudo rmmod test.ko
     
     <p class="small">
     
-        © Copyright 2019 Nick Bulischeck
+        © Copyright 2020 Nick Bulischeck
     
     </p>
 </footer>

@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="author" content="Nick Bulischeck">
 <meta name="description" content="Yet Another Cybersecurity Blog">
-<meta name="generator" content="Hugo 0.60.1" />
+<meta name="generator" content="Hugo 0.63.2" />
 <title>Introduction to Kernel Module Development</title>
 <link rel="shortcut icon" href="https://nbulischeck.io/images/favicon.ico">
 <link rel="stylesheet" href="https://nbulischeck.io/css/style.css">
@@ -96,11 +96,11 @@
     </header>
     <section id="post-body">
         <h2 id="introduction">Introduction</h2>
-<p>This post will serve as an introduction to those wanting to get into the development of loadable kernel modules. Loadable kernel modules, LKMs for short, are an integral companion to the Linux kernel. Imagine the Linux kernel as a giant robot. Let's say that this giant robot is already amazing as is, but you want to upgrade it with your own custom flamethrower. You'd have to first build your flamethrower and then attach it to the giant robot. You may not have helped build the giant robot, but you added some additional functionality to it. It runs the same way it did before, but now it's even better! This is exactly the same scenario for LKMs. Intuitively, when your giant robot's flamethrower is no longer needed (he or she is a pacifist now), it can be safely removed in order to free up space.</p>
+<p>This post will serve as an introduction to those wanting to get into the development of loadable kernel modules. Loadable kernel modules, LKMs for short, are an integral companion to the Linux kernel. Imagine the Linux kernel as a giant robot. Let&rsquo;s say that this giant robot is already amazing as is, but you want to upgrade it with your own custom flamethrower. You&rsquo;d have to first build your flamethrower and then attach it to the giant robot. You may not have helped build the giant robot, but you added some additional functionality to it. It runs the same way it did before, but now it&rsquo;s even better! This is exactly the same scenario for LKMs. Intuitively, when your giant robot&rsquo;s flamethrower is no longer needed (he or she is a pacifist now), it can be safely removed in order to free up space.</p>
 <p>Typically, LKMs are used to add support for new hardware (as device drivers) or filesystems, or add additional system calls. Without LKMs, an operating system would have to include all possible anticipated functionality. This is borderline impossible to do when developing a platform to be used with everything from a smartphone to a server.</p>
 <p>In summary, LKMs provide additional functionality to the kernel, and by extension the user of the computer, and can be safely added or removed when they are needed or not needed.</p>
 <h2 id="lkm-development">LKM Development</h2>
-<p>I'm making the assumption that most users have a competent grasp on the C language and have written a fair few programs before. Writing for the kernel, however, is quite different from writing userland applications. It would be unnecssary to cover them all in a single post (especially the introduction), but it usually boils down to the fact that you no longer have the glibc at your disposal, you have a restricted set of string functions to choose from (albeit I have no gripes as it's fairly robust), and now most of your core function names have a &lsquo;k&rsquo; somewhere in it (kmalloc, printk, etc.).</p>
+<p>I&rsquo;m making the assumption that most users have a competent grasp on the C language and have written a fair few programs before. Writing for the kernel, however, is quite different from writing userland applications. It would be unnecssary to cover them all in a single post (especially the introduction), but it usually boils down to the fact that you no longer have the glibc at your disposal, you have a restricted set of string functions to choose from (albeit I have no gripes as it&rsquo;s fairly robust), and now most of your core function names have a &lsquo;k&rsquo; somewhere in it (kmalloc, printk, etc.).</p>
 <h3 id="generic-lkm">Generic LKM</h3>
 <p>The following is a template for a generic kernel module and its corresponding makefile. It has no functionality other than to output <code>Hello, world!</code>, but you can practice loading and unloading the kernel module with <code>lsmod</code> and <code>rmmod</code> respectively.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#75715e">/* hello.c */</span>
@@ -144,7 +144,7 @@ obj-m <span style="color:#f92672">:=</span> <span style="color:#66d9ef">$(</span
 <p>To see the output of the kernel module, I recommend opening another terminal and running the command <code>watch journalctl -r -k -a</code>. To quickly break that down, <code>watch</code> refreshes the output every 2 seconds by default, <code>journalctl</code> shows your system logs, <code>-r</code> prints the log in reverse (latest messages are at the top), <code>-k</code> prints kernel messages only, and <code>-a</code> makes <code>journalctl</code> print all characters even unprintable characters or characters that go past the normal limit.</p>
 <p>For an extended (but outdated) reference to an introduction to kernel module development, please visit the <a href="http://www.tldp.org/LDP/lkmpg/2.6/html">TLDP Kernel Module Programming Guide</a>.</p>
 <h3 id="lkm-development-issues">LKM Development Issues</h3>
-<p>If you are looking to develop a LKM for your kernel in order to add some additional functionality (I'm assuming you are), I have unfortunate news. The documentation for kernel module development is extremely scarce. Also, including the TLDP guide I linked earlier, most of the currently available documentation online has outdated instructions. They are typically targeting the Linux kernel versions from 2.4 (2001) to 2.6 (2003). I have found that looking at recently created kernel modules and LKM rootkits on Github as well as the kernel source code of the kernel version you're targeting is the most effective way to develop a LKM.</p>
+<p>If you are looking to develop a LKM for your kernel in order to add some additional functionality (I&rsquo;m assuming you are), I have unfortunate news. The documentation for kernel module development is extremely scarce. Also, including the TLDP guide I linked earlier, most of the currently available documentation online has outdated instructions. They are typically targeting the Linux kernel versions from 2.4 (2001) to 2.6 (2003). I have found that looking at recently created kernel modules and LKM rootkits on Github as well as the kernel source code of the kernel version you&rsquo;re targeting is the most effective way to develop a LKM.</p>
 
     </section>
 </article>
@@ -175,7 +175,7 @@ obj-m <span style="color:#f92672">:=</span> <span style="color:#66d9ef">$(</span
     
     <p class="small">
     
-        © Copyright 2019 Nick Bulischeck
+        © Copyright 2020 Nick Bulischeck
     
     </p>
 </footer>
