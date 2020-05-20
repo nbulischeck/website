@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="author" content="Nick Bulischeck">
 <meta name="description" content="Yet Another Cybersecurity Blog">
-<meta name="generator" content="Hugo 0.63.2" />
+<meta name="generator" content="Hugo 0.70.0" />
 <title>Introduction to Kernel Module Development</title>
 <link rel="shortcut icon" href="https://nbulischeck.io/images/favicon.ico">
 <link rel="stylesheet" href="https://nbulischeck.io/css/style.css">
@@ -104,11 +104,11 @@
 <h3 id="generic-lkm">Generic LKM</h3>
 <p>The following is a template for a generic kernel module and its corresponding makefile. It has no functionality other than to output <code>Hello, world!</code>, but you can practice loading and unloading the kernel module with <code>lsmod</code> and <code>rmmod</code> respectively.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#75715e">/* hello.c */</span>
-<span style="color:#75715e">#</span><span style="color:#75715e">include</span> <span style="color:#75715e">&lt;linux/module.h&gt; /* Needed by all modules */</span><span style="color:#75715e">
-</span><span style="color:#75715e"></span><span style="color:#75715e">#</span><span style="color:#75715e">include</span> <span style="color:#75715e">&lt;linux/kernel.h&gt;</span><span style="color:#75715e">
+<span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;linux/module.h&gt; /* Needed by all modules */</span><span style="color:#75715e">
+</span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;linux/kernel.h&gt;</span><span style="color:#75715e">
 </span><span style="color:#75715e"></span>
 <span style="color:#66d9ef">int</span> <span style="color:#a6e22e">init_module</span>(<span style="color:#66d9ef">void</span>){
-	printk(KERN_INFO <span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">Hello, world!</span><span style="color:#e6db74">&#34;</span>);
+	printk(KERN_INFO <span style="color:#e6db74">&#34;Hello, world!&#34;</span>);
 	<span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
 }
 

